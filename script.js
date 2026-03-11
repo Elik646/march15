@@ -122,14 +122,14 @@ const candlesList = [];
 // ── Edit the caption for each slice below ──────────────────────────────────
 // Index 0 = first slice, index 7 = last slice.
 const SLICE_CAPTIONS = [
-  "Memory 1 ✨",  // Slice 1 — edit this text
-  "Memory 2 ✨",  // Slice 2 — edit this text
-  "Memory 3 ✨",  // Slice 3 — edit this text
-  "Memory 4 ✨",  // Slice 4 — edit this text
-  "Memory 5 ✨",  // Slice 5 — edit this text
-  "Memory 6 ✨",  // Slice 6 — edit this text
-  "Memory 7 ✨",  // Slice 7 — edit this text
-  "Memory 8 ✨",  // Slice 8 — edit this text
+  "Səhər nənənin Ad Günü",  // Slice 1 — edit this text
+  "Gürcüstanda Stamba Restoranı",  // Slice 2 — edit this text
+  "Taylandda Son Saatlar",  // Slice 3 — edit this text
+  "Rayon səfərləri",  // Slice 4 — edit this text
+  "Gözəl xanımlar",  // Slice 5 — edit this text
+  "Az qalmışdı yıxılım",  // Slice 6 — edit this text
+  "GYD aeroportu və Nərminənin çuduları",  // Slice 7 — edit this text
+  "10 yaşım və Sehrinin əcəbsəndəliyə oxşayan anları",  // Slice 8 — edit this text
 ];
 
 // ---------------------------------------------------------------------------
