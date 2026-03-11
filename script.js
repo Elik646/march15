@@ -400,8 +400,12 @@ function createSliceShape(startAngle, endAngle, radius) {
 // ---------------------------------------------------------------------------
 
 function imagePlaneForSlice(startAngle, endAngle, texture) {
-  // Plane covers the inner cut face (width = CAKE_RADIUS, height = CAKE_HEIGHT)
-  const geo = new THREE.PlaneGeometry(CAKE_RADIUS * 0.95, CAKE_HEIGHT * 0.95);
+  // Scale the image to fit the cake height while preserving the image's aspect ratio.
+  const planeHeight = CAKE_HEIGHT * 0.95;
+  const img = texture.image;
+  const aspectRatio = (img && img.width && img.height) ? img.width / img.height : 1;
+  const planeWidth = planeHeight * aspectRatio;
+  const geo = new THREE.PlaneGeometry(planeWidth, planeHeight);
 
   const mat = new THREE.MeshBasicMaterial({
     map: texture,
