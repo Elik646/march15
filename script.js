@@ -764,29 +764,27 @@ function animateSlices() {
     const cosA = Math.cos(angle);
     const sinA = Math.sin(angle);
 
-    // ---- Phase 1 (t: 0 → 0.45): rise straight up & separate ----
+    // ---- Phase 1 (t: 0 → 0.45): slide horizontally outward from cake ----
     const phase1 = Math.min(t / 0.45, 1);
     const te1 = easeOutCubic(phase1);
 
-    // ---- Phase 2 (t: 0.45 → 1): rotate Y and approach camera ----
+    // ---- Phase 2 (t: 0.45 → 1): rotate Y to face camera ----
     const phase2 = Math.max((t - 0.45) / 0.55, 0);
     const te2 = easeOutCubic(phase2);
 
-    // Rise — mostly in phase 1, held steady through phase 2
-    const liftY = 3.8 * te1;
+    // Pull radially outward in the XZ plane — no vertical rise
+    // Use just over the cake radius (3.55) to fully clear the slice from the cake
+    const outward = 3.8 * te1;
 
-    // Slight radial separation so the slice clears its neighbours
-    const outward = 0.55 * te1;
-
-    // Push the slice toward the camera (XZ direction) during phase 2
+    // Push the slice gently toward the camera (XZ direction) during phase 2
     _cameraXZ.set(camera.position.x, 0, camera.position.z);
     if (_cameraXZ.lengthSq() < 1e-6) _cameraXZ.set(0, 0, 1);
     else _cameraXZ.normalize();
-    const approachDist = 5.5 * te2;
+    const approachDist = 2.5 * te2;
 
     slice.position.set(
       cosA * outward + _cameraXZ.x * approachDist,
-      liftY,
+      0,
       sinA * outward + _cameraXZ.z * approachDist
     );
 
@@ -797,10 +795,7 @@ function animateSlices() {
     // ---- Rotate around Y so the inner cut face faces the camera ----
     // targetYRotation was computed at click time from the camera azimuth.
     const targetRot = state.targetYRotation;
-    // Also tilt the slice backward (rotate X) so the flat cut face tilts
-    // toward the (lower) camera and the image reads square-on.
-    const tiltX = -0.45 * te2;
-    slice.rotation.set(tiltX, targetRot * te2, 0);
+    slice.rotation.set(0, targetRot * te2, 0);
 
     // ---- Image plane fade-in (starts midway through phase 2, only when opening) ----
     const imgPlane = slice.userData.imagePlane;
