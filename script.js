@@ -24,21 +24,21 @@ const camera = new THREE.PerspectiveCamera(
   0.1,
   100
 );
-camera.position.set(0, 8.4, 12.5);
+camera.position.set(0, 4.5, 14);
 
 // LEFT drag now rotates; click reveals slices
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.enablePan = false;
 controls.enableZoom = false;
-controls.minPolarAngle = 0.7;
-controls.maxPolarAngle = 1.35;
+controls.minPolarAngle = 0.4;
+controls.maxPolarAngle = 1.5;
 controls.mouseButtons = {
   LEFT: THREE.MOUSE.ROTATE,
   MIDDLE: THREE.MOUSE.ROTATE,
   RIGHT: THREE.MOUSE.ROTATE
 };
-controls.target.set(0, 1.6, 0);
+controls.target.set(0, 1.0, 0);
 
 const ambient = new THREE.AmbientLight(0xffffff, 1.4);
 scene.add(ambient);
@@ -380,8 +380,8 @@ function createSliceShape(startAngle, endAngle, radius) {
 // ---------------------------------------------------------------------------
 
 function imagePlaneForSlice(startAngle, endAngle, texture) {
-  // Use a rectangular plane covering the inner cut face (width = CAKE_RADIUS, height = CAKE_HEIGHT)
-  const geo = new THREE.PlaneGeometry(CAKE_RADIUS * 0.92, CAKE_HEIGHT * 0.92);
+  // Plane covers the inner cut face (width = CAKE_RADIUS, height = CAKE_HEIGHT)
+  const geo = new THREE.PlaneGeometry(CAKE_RADIUS * 0.95, CAKE_HEIGHT * 0.95);
 
   const mat = new THREE.MeshBasicMaterial({
     map: texture,
@@ -396,11 +396,10 @@ function imagePlaneForSlice(startAngle, endAngle, texture) {
   // A PlaneGeometry faces +Z by default; rotation.y = -startAngle makes it face that direction.
   plane.rotation.y = -startAngle;
 
-  // Tiny outward offset (in the face's outward normal direction) to avoid z-fighting
-  // with the cake geometry. The normal is (-sin, 0, cos) for the face at startAngle.
-  const offset = 0.01;
+  // Nudge the plane outward along the face normal so it sits just in front of
+  // the cut face and avoids z-fighting with the frosting geometry.
+  const offset = 0.06;
   plane.position.set(
-    // Center of the cut face radially, then nudge outward along the face normal
     (CAKE_RADIUS / 2) * Math.cos(startAngle) + offset * (-Math.sin(startAngle)),
     CAKE_HEIGHT / 2,
     (CAKE_RADIUS / 2) * Math.sin(startAngle) + offset * Math.cos(startAngle)
@@ -713,7 +712,7 @@ resetBtn.addEventListener("click", () => {
 
   animatedSlices.length = 0;
   controls.reset();
-  controls.target.set(0, 1.6, 0);
+  controls.target.set(0, 1.0, 0);
   controls.update();
   updateStatus("Cake reset — click on any slice to reveal a memory! 🎂");
 });
@@ -774,7 +773,7 @@ function animateSlices() {
     const te2 = easeOutCubic(phase2);
 
     // Rise — mostly in phase 1, held steady through phase 2
-    const liftY = 4.8 * te1;
+    const liftY = 3.8 * te1;
 
     // Slight radial separation so the slice clears its neighbours
     const outward = 0.55 * te1;
@@ -783,7 +782,7 @@ function animateSlices() {
     _cameraXZ.set(camera.position.x, 0, camera.position.z);
     if (_cameraXZ.lengthSq() < 1e-6) _cameraXZ.set(0, 0, 1);
     else _cameraXZ.normalize();
-    const approachDist = 3.0 * te2;
+    const approachDist = 5.5 * te2;
 
     slice.position.set(
       cosA * outward + _cameraXZ.x * approachDist,
@@ -792,18 +791,21 @@ function animateSlices() {
     );
 
     // Gentle uniform scale — gives a "coming closer" feel
-    const scale = 1 + 0.3 * te2;
+    const scale = 1 + 0.45 * te2;
     slice.scale.setScalar(scale);
 
     // ---- Rotate around Y so the inner cut face faces the camera ----
     // targetYRotation was computed at click time from the camera azimuth.
     const targetRot = state.targetYRotation;
-    slice.rotation.set(0, targetRot * te2, 0);
+    // Also tilt the slice backward (rotate X) so the flat cut face tilts
+    // toward the (lower) camera and the image reads square-on.
+    const tiltX = -0.45 * te2;
+    slice.rotation.set(tiltX, targetRot * te2, 0);
 
     // ---- Image plane fade-in (starts midway through phase 2, only when opening) ----
     const imgPlane = slice.userData.imagePlane;
-    if (!state.closing && phase2 > 0.4) {
-      const fadeT = (phase2 - 0.4) / 0.6;
+    if (!state.closing && phase2 > 0.35) {
+      const fadeT = (phase2 - 0.35) / 0.65;
       imgPlane.material.opacity = Math.min(easeOutCubic(fadeT), 1);
     } else {
       imgPlane.material.opacity = 0;
