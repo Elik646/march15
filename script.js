@@ -40,10 +40,10 @@ controls.mouseButtons = {
 };
 controls.target.set(0, 1.0, 0);
 
-const ambient = new THREE.AmbientLight(0xffffff, 1.4);
+const ambient = new THREE.AmbientLight(0xffffff, 0.05);
 scene.add(ambient);
 
-const keyLight = new THREE.DirectionalLight(0xfff8f0, 1.7);
+const keyLight = new THREE.DirectionalLight(0xfff8f0, 0);
 keyLight.position.set(8, 14, 10);
 keyLight.castShadow = true;
 keyLight.shadow.mapSize.width = 2048;
@@ -56,11 +56,11 @@ keyLight.shadow.camera.top = 14;
 keyLight.shadow.camera.bottom = -14;
 scene.add(keyLight);
 
-const rimLight = new THREE.DirectionalLight(0xffd7ee, 0.85);
+const rimLight = new THREE.DirectionalLight(0xffd7ee, 0);
 rimLight.position.set(-8, 7, -10);
 scene.add(rimLight);
 
-const fillLight = new THREE.DirectionalLight(0xfff0e0, 0.5);
+const fillLight = new THREE.DirectionalLight(0xfff0e0, 0);
 fillLight.position.set(0, -4, 8);
 scene.add(fillLight);
 
@@ -117,6 +117,7 @@ const SLICE_ANGLE = (Math.PI * 2) / SLICE_COUNT;
 
 const slices = [];
 const animatedSlices = [];
+const candlesList = [];
 
 // ---------------------------------------------------------------------------
 // Textures — improved to look more like real cake
@@ -337,6 +338,7 @@ function makeCandle(color = 0xffd4ea) {
   );
   flame.position.y = 0.72;
   flame.scale.set(0.85, 1.3, 0.85);
+  flame.visible = false;
   candle.add(flame);
 
   // Inner bright flame core
@@ -345,11 +347,16 @@ function makeCandle(color = 0xffd4ea) {
     new THREE.MeshBasicMaterial({ color: 0xfff4a0 })
   );
   flameCore.position.y = 0.715;
+  flameCore.visible = false;
   candle.add(flameCore);
 
-  const glow = new THREE.PointLight(0xffbd66, 0.45, 1.6, 2);
+  const glow = new THREE.PointLight(0xffbd66, 0, 1.6, 2);
   glow.position.y = 0.72;
   candle.add(glow);
+
+  candle.userData.flame = flame;
+  candle.userData.flameCore = flameCore;
+  candle.userData.glow = glow;
 
   return candle;
 }
@@ -449,6 +456,7 @@ function addSliceDecorations(sliceGroup, sliceIndex) {
     const candle = makeCandle(ci === 0 ? 0xffd2ea : 0xfff1b8);
     candle.position.set(Math.cos(a) * r, topY, Math.sin(a) * r);
     sliceGroup.add(candle);
+    candlesList.push(candle);
   });
 
   // ---- Frosting drips (4 per slice along outer edge) ----
@@ -829,19 +837,91 @@ function onResize() {
 window.addEventListener("resize", onResize);
 
 // ---------------------------------------------------------------------------
+// Candle intro sequence
+// ---------------------------------------------------------------------------
+
+function lightCandle(candleGroup) {
+  const { flame, flameCore, glow } = candleGroup.userData;
+  flame.visible = true;
+  flameCore.visible = true;
+
+  const startTime = performance.now();
+  const duration = 450;
+
+  function tick() {
+    const elapsed = performance.now() - startTime;
+    const t = Math.min(elapsed / duration, 1);
+    const easedT = easeOutCubic(t);
+    // Brief flicker effect while the flame ignites
+    const flicker = t < 0.7 ? 0.5 + 0.5 * Math.abs(Math.sin(elapsed * 0.045)) : 1;
+    glow.intensity = 0.45 * easedT * flicker;
+    if (t < 1) {
+      requestAnimationFrame(tick);
+    } else {
+      glow.intensity = 0.45;
+    }
+  }
+
+  tick();
+}
+
+function revealMainLights(onComplete) {
+  const startTime = performance.now();
+  const duration = 1800;
+  const overlay = document.getElementById("dark-overlay");
+  overlay.style.opacity = "0";
+
+  function tick() {
+    const t = Math.min((performance.now() - startTime) / duration, 1);
+    const et = easeOutCubic(t);
+    ambient.intensity = 0.05 + 1.35 * et;
+    keyLight.intensity = 1.7 * et;
+    rimLight.intensity = 0.85 * et;
+    fillLight.intensity = 0.5 * et;
+    if (t < 1) {
+      requestAnimationFrame(tick);
+    } else {
+      if (onComplete) onComplete();
+    }
+  }
+
+  tick();
+}
+
+function revealUI() {
+  const hero = document.querySelector(".hero");
+  const uiPanel = document.querySelector(".ui-panel");
+  hero.classList.add("ui-revealed");
+  setTimeout(() => {
+    uiPanel.classList.add("ui-revealed");
+  }, 300);
+}
+
+// ---------------------------------------------------------------------------
 // Init & render loop
 // ---------------------------------------------------------------------------
 
 async function init() {
-  updateStatus("Preparing the cake…");
-
   const memoryTextures = await Promise.all(
     Array.from({ length: SLICE_COUNT }, (_, i) => loadMemoryTexture(i))
   );
 
   buildCake(memoryTextures);
   cakeRoot.position.y = -0.3;
-  updateStatus("Click on any slice to reveal a memory! 🎂");
+
+  // Light candles one by one, then reveal scene lights and UI
+  const CANDLE_INTERVAL = 300; // ms between each candle lighting
+  candlesList.forEach((candle, i) => {
+    setTimeout(() => lightCandle(candle), i * CANDLE_INTERVAL);
+  });
+
+  const allLitDelay = candlesList.length * CANDLE_INTERVAL + 600;
+  setTimeout(() => {
+    revealMainLights(() => {
+      updateStatus("Click on any slice to reveal a memory! 🎂");
+      revealUI();
+    });
+  }, allLitDelay);
 }
 
 function animate() {
