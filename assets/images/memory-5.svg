@@ -1,13 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="800" height="1000" viewBox="0 0 800 1000">
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="700" viewBox="0 0 900 700">
   <defs>
-    <linearGradient id="g5" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#ffd7e6"/>
-      <stop offset="100%" stop-color="#ffb7c7"/>
+    <linearGradient id="bg5" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffd6e8"/>
+      <stop offset="50%" stop-color="#f8b4d0"/>
+      <stop offset="100%" stop-color="#f4a0c8"/>
     </linearGradient>
+    <radialGradient id="glow5" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.6)"/>
+      <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+    </radialGradient>
   </defs>
-  <rect width="800" height="1000" fill="url(#g5)"/>
-  <circle cx="400" cy="360" r="180" fill="rgba(255,255,255,0.35)"/>
-  <rect x="140" y="580" width="520" height="190" rx="36" fill="rgba(255,255,255,0.78)"/>
-  <text x="400" y="655" text-anchor="middle" font-size="48" font-family="Arial, sans-serif" fill="#7a4057" font-weight="700">Memory 5</text>
-  <text x="400" y="718" text-anchor="middle" font-size="28" font-family="Arial, sans-serif" fill="#8f5a70">Replace this with your photo</text>
+  <rect width="900" height="700" fill="url(#bg5)"/>
+  <ellipse cx="450" cy="350" rx="320" ry="250" fill="url(#glow5)"/>
+  <circle cx="450" cy="270" r="130" fill="rgba(255,255,255,0.45)" stroke="rgba(255,255,255,0.7)" stroke-width="3"/>
+  <text x="450" y="258" text-anchor="middle" font-size="90" font-family="serif">🎂</text>
+  <rect x="150" y="390" width="600" height="200" rx="40" fill="rgba(255,255,255,0.82)"/>
+  <text x="450" y="467" text-anchor="middle" font-size="54" font-family="Georgia,serif" fill="#7a3055" font-weight="700">Memory 5</text>
+  <text x="450" y="540" text-anchor="middle" font-size="30" font-family="Arial,sans-serif" fill="#9c5573">Add your photo to assets/images/memory-5.jpg</text>
 </svg>
