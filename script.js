@@ -1,5 +1,5 @@
-import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
-import { OrbitControls } from "https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js";
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
 const sceneEl = document.getElementById("scene");
 const statusText = document.getElementById("statusText");
@@ -34,7 +34,7 @@ controls.minPolarAngle = 0.7;
 controls.maxPolarAngle = 1.35;
 controls.mouseButtons = {
   LEFT: null,
-  MIDDLE: null,
+  MIDDLE: THREE.MOUSE.ROTATE,
   RIGHT: THREE.MOUSE.ROTATE
 };
 controls.target.set(0, 1.6, 0);
@@ -191,17 +191,11 @@ const spongeTexture = createSpongeTexture();
 const textureLoader = new THREE.TextureLoader();
 
 function loadMemoryTexture(index) {
-  return new Promise((resolve) => {
-    const path = `assets/images/memory-${index + 1}.jpg`;
+  const extensions = ["jpg", "jpeg", "png", "svg"];
 
-    textureLoader.load(
-      path,
-      (texture) => {
-        texture.colorSpace = THREE.SRGBColorSpace;
-        resolve(texture);
-      },
-      undefined,
-      () => {
+  function tryLoad(extIndex) {
+    return new Promise((resolve) => {
+      if (extIndex >= extensions.length) {
         const canvas = document.createElement("canvas");
         canvas.width = 900;
         canvas.height = 700;
@@ -233,14 +227,28 @@ function loadMemoryTexture(index) {
 
         ctx.fillStyle = "#7a6272";
         ctx.font = "32px Inter, sans-serif";
-        ctx.fillText("Add your own JPG photo in assets/images", canvas.width / 2, canvas.height / 2 + 42);
+        ctx.fillText("Add your own photo in assets/images", canvas.width / 2, canvas.height / 2 + 42);
 
         const texture = new THREE.CanvasTexture(canvas);
         texture.colorSpace = THREE.SRGBColorSpace;
         resolve(texture);
+        return;
       }
-    );
-  });
+
+      const path = `assets/images/memory-${index + 1}.${extensions[extIndex]}`;
+      textureLoader.load(
+        path,
+        (texture) => {
+          texture.colorSpace = THREE.SRGBColorSpace;
+          resolve(texture);
+        },
+        undefined,
+        () => tryLoad(extIndex + 1).then(resolve)
+      );
+    });
+  }
+
+  return tryLoad(0);
 }
 
 function makeCandle(color = 0xffd4ea) {
@@ -499,6 +507,22 @@ function smallestAngleDiff(a, b) {
   return Math.abs(diff);
 }
 
+let rotateKeyHeld = false;
+
+window.addEventListener("keydown", (e) => {
+  if (e.key === "Control" || e.key === "Meta") {
+    rotateKeyHeld = true;
+    controls.mouseButtons.LEFT = THREE.MOUSE.ROTATE;
+  }
+});
+
+window.addEventListener("keyup", (e) => {
+  if (e.key === "Control" || e.key === "Meta") {
+    rotateKeyHeld = false;
+    controls.mouseButtons.LEFT = null;
+  }
+});
+
 let isLeftDragging = false;
 let lastDragAngle = null;
 let lastCutTime = 0;
@@ -572,7 +596,7 @@ renderer.domElement.addEventListener("contextmenu", (event) => {
 });
 
 renderer.domElement.addEventListener("pointerdown", (event) => {
-  if (event.button === 0) {
+  if (event.button === 0 && !rotateKeyHeld) {
     isLeftDragging = true;
     sceneEl.classList.add("knife-mode");
     lastDragAngle = angleFromScreenPosition(event.clientX, event.clientY);
