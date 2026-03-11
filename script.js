@@ -1,460 +1,676 @@
-import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
+import { OrbitControls } from "https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js";
 
-const canvas = document.getElementById('scene');
-const statusEl = document.getElementById('status');
-const resetButton = document.getElementById('resetButton');
+const sceneEl = document.getElementById("scene");
+const statusText = document.getElementById("statusText");
+const resetBtn = document.getElementById("resetBtn");
 
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+const renderer = new THREE.WebGLRenderer({
+  antialias: true,
+  alpha: true
+});
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(sceneEl.clientWidth, sceneEl.clientHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+sceneEl.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-scene.fog = new THREE.Fog(0xf8edf3, 18, 34);
 
-const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
-camera.position.set(0, 7.2, 10.6);
+const camera = new THREE.PerspectiveCamera(
+  42,
+  sceneEl.clientWidth / sceneEl.clientHeight,
+  0.1,
+  100
+);
+camera.position.set(0, 8.4, 12.5);
 
-const controls = new OrbitControls(camera, canvas);
-controls.enablePan = false;
+const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
-controls.minDistance = 7;
-controls.maxDistance = 16;
-controls.minPolarAngle = 0.55;
-controls.maxPolarAngle = 1.38;
-controls.mouseButtons.LEFT = null;
-controls.mouseButtons.RIGHT = THREE.MOUSE.ROTATE;
-controls.mouseButtons.MIDDLE = THREE.MOUSE.DOLLY;
+controls.enablePan = false;
+controls.enableZoom = false;
+controls.minPolarAngle = 0.7;
+controls.maxPolarAngle = 1.35;
+controls.mouseButtons = {
+  LEFT: null,
+  MIDDLE: null,
+  RIGHT: THREE.MOUSE.ROTATE
+};
+controls.target.set(0, 1.6, 0);
 
-const ambient = new THREE.HemisphereLight(0xfff0f7, 0xd8b1a8, 1.55);
+const ambient = new THREE.AmbientLight(0xffffff, 1.35);
 scene.add(ambient);
 
-const keyLight = new THREE.DirectionalLight(0xffffff, 1.85);
-keyLight.position.set(6, 12, 8);
+const keyLight = new THREE.DirectionalLight(0xffffff, 1.6);
+keyLight.position.set(8, 14, 10);
 keyLight.castShadow = true;
-keyLight.shadow.mapSize.set(2048, 2048);
-keyLight.shadow.camera.left = -12;
-keyLight.shadow.camera.right = 12;
-keyLight.shadow.camera.top = 12;
-keyLight.shadow.camera.bottom = -12;
+keyLight.shadow.mapSize.width = 2048;
+keyLight.shadow.mapSize.height = 2048;
+keyLight.shadow.camera.near = 1;
+keyLight.shadow.camera.far = 40;
+keyLight.shadow.camera.left = -14;
+keyLight.shadow.camera.right = 14;
+keyLight.shadow.camera.top = 14;
+keyLight.shadow.camera.bottom = -14;
 scene.add(keyLight);
 
-const fillLight = new THREE.PointLight(0xffd5ee, 18, 28, 2);
-fillLight.position.set(-6, 4, -4);
-scene.add(fillLight);
+const rimLight = new THREE.DirectionalLight(0xffd7ee, 0.9);
+rimLight.position.set(-8, 7, -10);
+scene.add(rimLight);
 
-const root = new THREE.Group();
-scene.add(root);
+const group = new THREE.Group();
+scene.add(group);
 
-const plateMaterial = new THREE.MeshPhysicalMaterial({
-  color: 0xfaf8fb,
-  roughness: 0.42,
-  metalness: 0.04,
-  clearcoat: 0.35,
-  clearcoatRoughness: 0.25
-});
-const plate = new THREE.Mesh(new THREE.CylinderGeometry(4.7, 5, 0.36, 64), plateMaterial);
-plate.receiveShadow = true;
-plate.position.y = -1.38;
-root.add(plate);
+const floor = new THREE.Mesh(
+  new THREE.CircleGeometry(10, 80),
+  new THREE.ShadowMaterial({ opacity: 0.18 })
+);
+floor.rotation.x = -Math.PI / 2;
+floor.position.y = -1.06;
+floor.receiveShadow = true;
+scene.add(floor);
 
-const cake = new THREE.Group();
-root.add(cake);
+const cakeStand = new THREE.Group();
+group.add(cakeStand);
 
-const CAKE_RADIUS = 3.35;
-const CAKE_HEIGHT = 2.3;
+const standPlate = new THREE.Mesh(
+  new THREE.CylinderGeometry(4.9, 5.3, 0.35, 64),
+  new THREE.MeshStandardMaterial({
+    color: 0xf9f6fb,
+    roughness: 0.45,
+    metalness: 0.05
+  })
+);
+standPlate.position.y = -0.68;
+standPlate.receiveShadow = true;
+standPlate.castShadow = true;
+cakeStand.add(standPlate);
+
+const standStem = new THREE.Mesh(
+  new THREE.CylinderGeometry(1.2, 1.5, 0.7, 48),
+  new THREE.MeshStandardMaterial({
+    color: 0xf3edf7,
+    roughness: 0.55,
+    metalness: 0.04
+  })
+);
+standStem.position.y = -1.18;
+standStem.castShadow = true;
+standStem.receiveShadow = true;
+cakeStand.add(standStem);
+
+const standBase = new THREE.Mesh(
+  new THREE.CylinderGeometry(2.8, 3.5, 0.36, 56),
+  new THREE.MeshStandardMaterial({
+    color: 0xf6f0f8,
+    roughness: 0.5,
+    metalness: 0.04
+  })
+);
+standBase.position.y = -1.65;
+standBase.castShadow = true;
+standBase.receiveShadow = true;
+cakeStand.add(standBase);
+
+const cakeRoot = new THREE.Group();
+group.add(cakeRoot);
+
+const CAKE_RADIUS = 3.55;
+const CAKE_HEIGHT = 2.25;
 const SLICE_COUNT = 8;
 const SLICE_ANGLE = (Math.PI * 2) / SLICE_COUNT;
-const CUT_TOLERANCE = 0.18;
+
 const slices = [];
-const cutBoundaries = new Array(SLICE_COUNT).fill(false);
-let pointerDown = false;
-let currentStrokeAngles = [];
+const animatedSlices = [];
 
-const raycaster = new THREE.Raycaster();
-const pointer = new THREE.Vector2();
-const cutPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-const planeHit = new THREE.Vector3();
+function createCreamTexture() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 1024;
+  canvas.height = 128;
+  const ctx = canvas.getContext("2d");
 
-const textureLoader = new THREE.TextureLoader();
-
-function makeTextTexture(text) {
-  const c = document.createElement('canvas');
-  c.width = 1024;
-  c.height = 512;
-  const ctx = c.getContext('2d');
-  const g = ctx.createLinearGradient(0, 0, c.width, c.height);
-  g.addColorStop(0, '#ffd8ef');
-  g.addColorStop(1, '#ffffff');
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, c.width, c.height);
-  ctx.fillStyle = '#7e3755';
-  ctx.font = '700 138px Playfair Display, serif';
-  ctx.textAlign = 'center';
-  ctx.fillText(text, c.width / 2, 210);
-  ctx.font = '500 54px Inter, sans-serif';
-  ctx.fillStyle = '#9b6c84';
-  ctx.fillText('memory', c.width / 2, 296);
-  return new THREE.CanvasTexture(c);
-}
-
-function createPlaceholderTexture(index) {
-  const c = document.createElement('canvas');
-  c.width = 900;
-  c.height = 900;
-  const ctx = c.getContext('2d');
-  const grad = ctx.createLinearGradient(0, 0, c.width, c.height);
-  grad.addColorStop(0, '#ffd9ea');
-  grad.addColorStop(1, '#fbe9c6');
+  const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  grad.addColorStop(0, "#ffe7f1");
+  grad.addColorStop(0.45, "#ffd7ea");
+  grad.addColorStop(1, "#ffc3df");
   ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, c.width, c.height);
-  ctx.fillStyle = 'rgba(255,255,255,0.48)';
-  for (let i = 0; i < 8; i += 1) {
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  for (let x = 0; x < canvas.width; x += 26) {
+    const h = 16 + Math.sin(x * 0.05) * 6;
+    ctx.fillStyle = "rgba(255,255,255,0.35)";
     ctx.beginPath();
-    ctx.arc(140 + i * 85, 130 + (i % 2) * 55, 26 + (i % 3) * 8, 0, Math.PI * 2);
+    ctx.arc(x, 20 + h * 0.2, 10, 0, Math.PI * 2);
     ctx.fill();
   }
-  ctx.fillStyle = '#7a3957';
-  ctx.font = '700 120px Playfair Display, serif';
-  ctx.textAlign = 'center';
-  ctx.fillText(`Photo ${index + 1}`, c.width / 2, 420);
-  ctx.font = '500 48px Inter, sans-serif';
-  ctx.fillStyle = '#9f6f84';
-  ctx.fillText('Replace with your own image', c.width / 2, 510);
-  return new THREE.CanvasTexture(c);
+
+  for (let x = 0; x < canvas.width; x += 36) {
+    ctx.fillStyle = "rgba(255,255,255,0.22)";
+    ctx.beginPath();
+    ctx.arc(x + 10, 62, 8, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(1.35, 1);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
 }
+
+function createSpongeTexture() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 1024;
+  canvas.height = 512;
+  const ctx = canvas.getContext("2d");
+
+  ctx.fillStyle = "#e8b07d";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  for (let i = 0; i < 2400; i += 1) {
+    const x = Math.random() * canvas.width;
+    const y = Math.random() * canvas.height;
+    const r = 1 + Math.random() * 5;
+    ctx.fillStyle = Math.random() > 0.5 ? "rgba(184,115,68,0.22)" : "rgba(255,231,191,0.22)";
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+const creamTexture = createCreamTexture();
+const spongeTexture = createSpongeTexture();
+const textureLoader = new THREE.TextureLoader();
 
 function loadMemoryTexture(index) {
   return new Promise((resolve) => {
     const path = `assets/images/memory-${index + 1}.jpg`;
+
     textureLoader.load(
       path,
-      (tex) => {
-        tex.colorSpace = THREE.SRGBColorSpace;
-        resolve(tex);
+      (texture) => {
+        texture.colorSpace = THREE.SRGBColorSpace;
+        resolve(texture);
       },
       undefined,
-      () => resolve(createPlaceholderTexture(index))
+      () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = 900;
+        canvas.height = 700;
+        const ctx = canvas.getContext("2d");
+
+        const grad = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+        grad.addColorStop(0, "#f6bfd9");
+        grad.addColorStop(1, "#f1d8a8");
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.fillStyle = "rgba(255,255,255,0.55)";
+        for (let i = 0; i < 18; i += 1) {
+          ctx.beginPath();
+          ctx.arc(
+            Math.random() * canvas.width,
+            Math.random() * canvas.height,
+            20 + Math.random() * 90,
+            0,
+            Math.PI * 2
+          );
+          ctx.fill();
+        }
+
+        ctx.fillStyle = "#6a3f57";
+        ctx.font = "bold 74px Inter, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(`Memory ${index + 1}`, canvas.width / 2, canvas.height / 2 - 16);
+
+        ctx.fillStyle = "#7a6272";
+        ctx.font = "32px Inter, sans-serif";
+        ctx.fillText("Add your own JPG photo in assets/images", canvas.width / 2, canvas.height / 2 + 42);
+
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.colorSpace = THREE.SRGBColorSpace;
+        resolve(texture);
+      }
     );
   });
 }
 
-function createSectorShape(start, end, radius) {
+function makeCandle(color = 0xffd4ea) {
+  const candle = new THREE.Group();
+
+  const body = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.07, 0.08, 0.58, 16),
+    new THREE.MeshStandardMaterial({
+      color,
+      roughness: 0.55
+    })
+  );
+  body.castShadow = true;
+  body.position.y = 0.29;
+  candle.add(body);
+
+  const wick = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.01, 0.01, 0.06, 8),
+    new THREE.MeshStandardMaterial({ color: 0x3b2d2a })
+  );
+  wick.position.y = 0.62;
+  candle.add(wick);
+
+  const flame = new THREE.Mesh(
+    new THREE.SphereGeometry(0.06, 12, 12),
+    new THREE.MeshBasicMaterial({
+      color: 0xffc25a
+    })
+  );
+  flame.position.y = 0.72;
+  flame.scale.set(0.85, 1.25, 0.85);
+  candle.add(flame);
+
+  const glow = new THREE.PointLight(0xffbd66, 0.4, 1.5, 2);
+  glow.position.y = 0.72;
+  candle.add(glow);
+
+  return candle;
+}
+
+function makeLetterTopper(letter) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext("2d");
+
+  ctx.clearRect(0, 0, 256, 256);
+  ctx.fillStyle = "#8f4b6c";
+  ctx.font = "bold 200px 'Cormorant Garamond'";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(letter, 128, 140);
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+
+  const mat = new THREE.SpriteMaterial({
+    map: tex,
+    transparent: true
+  });
+
+  const sprite = new THREE.Sprite(mat);
+  sprite.scale.set(0.65, 0.65, 0.65);
+
+  const holder = new THREE.Group();
+  holder.add(sprite);
+
+  const stick = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.01, 0.01, 0.42, 8),
+    new THREE.MeshStandardMaterial({ color: 0xf8e5ef })
+  );
+  stick.position.y = -0.28;
+  holder.add(stick);
+
+  return holder;
+}
+
+function createSliceShape(startAngle, endAngle, radius) {
   const shape = new THREE.Shape();
   shape.moveTo(0, 0);
-  shape.absarc(0, 0, radius, start, end, false);
+  shape.lineTo(Math.cos(startAngle) * radius, Math.sin(startAngle) * radius);
+
+  const steps = 30;
+  for (let i = 1; i <= steps; i += 1) {
+    const t = i / steps;
+    const a = startAngle + (endAngle - startAngle) * t;
+    shape.lineTo(Math.cos(a) * radius, Math.sin(a) * radius);
+  }
+
   shape.lineTo(0, 0);
   return shape;
 }
 
-function createCakeSlice(index, memoryTexture) {
-  const start = index * SLICE_ANGLE;
-  const end = start + SLICE_ANGLE;
-  const mid = (start + end) / 2;
+function imagePlaneForSlice(startAngle, endAngle, texture) {
+  const angleMid = (startAngle + endAngle) / 2;
+  const innerRadius = CAKE_RADIUS * 0.48;
+  const width = CAKE_RADIUS * 1.6 * Math.sin((endAngle - startAngle) / 2) * 2;
+  const height = CAKE_HEIGHT * 0.78;
 
-  const group = new THREE.Group();
-  group.userData = {
-    index,
-    startBoundary: index,
-    endBoundary: (index + 1) % SLICE_COUNT,
-    isOpen: false,
-    lift: 0,
-    targetLift: 0,
-    push: 0,
-    targetPush: 0,
-    midAngle: mid,
-    imagePlane: null,
-    cutHighlight: null
-  };
-
-  const bodyGeom = new THREE.ExtrudeGeometry(createSectorShape(start, end, CAKE_RADIUS), {
-    depth: CAKE_HEIGHT,
-    bevelEnabled: false,
-    curveSegments: 32,
-    steps: 1
-  });
-  bodyGeom.rotateX(Math.PI / 2);
-  bodyGeom.translate(0, CAKE_HEIGHT / 2 - 1.1, 0);
-
-  const bodyMat = new THREE.MeshStandardMaterial({ color: 0xe8a179, roughness: 0.78, metalness: 0.02 });
-  const cakeBody = new THREE.Mesh(bodyGeom, bodyMat);
-  cakeBody.castShadow = true;
-  cakeBody.receiveShadow = true;
-  group.add(cakeBody);
-
-  const icingGeom = new THREE.ExtrudeGeometry(createSectorShape(start, end, CAKE_RADIUS + 0.03), {
-    depth: 0.42,
-    bevelEnabled: false,
-    curveSegments: 32,
-    steps: 1
-  });
-  icingGeom.rotateX(Math.PI / 2);
-  icingGeom.translate(0, CAKE_HEIGHT + 0.01 - 1.1, 0);
-
-  const icingMat = new THREE.MeshPhysicalMaterial({
-    color: 0xffd3e8,
-    roughness: 0.38,
-    metalness: 0.01,
-    clearcoat: 0.55,
-    clearcoatRoughness: 0.15
-  });
-  const icing = new THREE.Mesh(icingGeom, icingMat);
-  icing.castShadow = true;
-  icing.receiveShadow = true;
-  group.add(icing);
-
-  const dripCount = 5;
-  for (let i = 0; i < dripCount; i += 1) {
-    const t = (i + 1) / (dripCount + 1);
-    const ang = start + (end - start) * t;
-    const h = 0.38 + (i % 3) * 0.14;
-    const drip = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.085, 0.12, h, 12),
-      icingMat
-    );
-    drip.position.set(Math.cos(ang) * (CAKE_RADIUS - 0.03), CAKE_HEIGHT - h / 2 - 1.1, Math.sin(ang) * (CAKE_RADIUS - 0.03));
-    drip.castShadow = true;
-    group.add(drip);
-  }
-
-  const memoryPlane = new THREE.Mesh(
-    new THREE.PlaneGeometry(1.9, 1.9),
-    new THREE.MeshBasicMaterial({ map: memoryTexture, transparent: true })
+  const plane = new THREE.Mesh(
+    new THREE.PlaneGeometry(Math.max(width, 1.3), height),
+    new THREE.MeshBasicMaterial({
+      map: texture,
+      side: THREE.DoubleSide
+    })
   );
-  memoryPlane.rotation.x = -Math.PI / 2;
-  memoryPlane.position.set(Math.cos(mid) * 1.25, -1.08, Math.sin(mid) * 1.25);
-  memoryPlane.visible = false;
-  root.add(memoryPlane);
-  group.userData.imagePlane = memoryPlane;
 
-  const highlightMat = new THREE.MeshBasicMaterial({ color: 0xff7fb9, transparent: true, opacity: 0 });
-  const edgeLength = CAKE_RADIUS + 0.1;
-  const edge = new THREE.Mesh(new THREE.BoxGeometry(0.06, CAKE_HEIGHT + 0.5, edgeLength), highlightMat);
-  edge.position.y = 0.08;
-  edge.rotation.y = -start;
-  group.add(edge);
-  group.userData.cutHighlight = edge;
-
-  cake.add(group);
-  slices.push(group);
-}
-
-function addCandles() {
-  const candlePalette = [0xff8fb8, 0xffddb3, 0xffa4f0, 0xffe08a];
-  const candleRing = new THREE.Group();
-  root.add(candleRing);
-
-  for (let i = 0; i < 12; i += 1) {
-    const angle = (i / 12) * Math.PI * 2;
-    const color = candlePalette[i % candlePalette.length];
-    const candle = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.08, 0.08, 0.7, 18),
-      new THREE.MeshStandardMaterial({ color, roughness: 0.5 })
-    );
-    candle.position.set(Math.cos(angle) * 2.15, CAKE_HEIGHT + 0.26 - 1.1, Math.sin(angle) * 2.15);
-    candle.castShadow = true;
-    candleRing.add(candle);
-
-    const flame = new THREE.Mesh(
-      new THREE.SphereGeometry(0.1, 14, 14),
-      new THREE.MeshBasicMaterial({ color: 0xffd769 })
-    );
-    flame.scale.set(0.7, 1.5, 0.7);
-    flame.position.copy(candle.position).add(new THREE.Vector3(0, 0.46, 0));
-    candleRing.add(flame);
-
-    const glow = new THREE.PointLight(0xffbb56, 0.45, 2.7, 2);
-    glow.position.copy(flame.position);
-    candleRing.add(glow);
-  }
-
-  const topperTexture = makeTextTexture('MAMA');
-  topperTexture.colorSpace = THREE.SRGBColorSpace;
-  const topper = new THREE.Mesh(
-    new THREE.PlaneGeometry(2.15, 1.05),
-    new THREE.MeshBasicMaterial({ map: topperTexture, transparent: true })
+  plane.position.set(
+    Math.cos(angleMid) * innerRadius,
+    CAKE_HEIGHT * 0.5,
+    Math.sin(angleMid) * innerRadius
   );
-  topper.position.set(0, CAKE_HEIGHT + 0.55 - 1.1, 0);
-  topper.rotation.x = -Math.PI / 2;
-  root.add(topper);
+  plane.lookAt(
+    Math.cos(angleMid) * (innerRadius + 1.2),
+    CAKE_HEIGHT * 0.5,
+    Math.sin(angleMid) * (innerRadius + 1.2)
+  );
+
+  return plane;
 }
 
-function addBoardDecor() {
-  const crumbs = new THREE.Group();
-  root.add(crumbs);
-  for (let i = 0; i < 26; i += 1) {
-    const s = 0.03 + Math.random() * 0.08;
-    const crumb = new THREE.Mesh(
-      new THREE.SphereGeometry(s, 10, 10),
-      new THREE.MeshStandardMaterial({ color: i % 2 ? 0xe6a179 : 0xffd3e8, roughness: 0.95 })
-    );
-    const ang = Math.random() * Math.PI * 2;
-    const dist = 3.8 + Math.random() * 1.2;
-    crumb.position.set(Math.cos(ang) * dist, -1.18 + Math.random() * 0.02, Math.sin(ang) * dist);
-    crumbs.add(crumb);
-  }
-}
-
-function markBoundaryCut(boundaryIndex) {
-  if (cutBoundaries[boundaryIndex]) return;
-  cutBoundaries[boundaryIndex] = true;
-  const slice = slices[boundaryIndex];
-  if (slice) {
-    slice.userData.cutHighlight.material.opacity = 0.9;
-  }
-}
-
-function updateCompletedSlices() {
-  for (const slice of slices) {
-    const { startBoundary, endBoundary, isOpen } = slice.userData;
-    if (!isOpen && cutBoundaries[startBoundary] && cutBoundaries[endBoundary]) {
-      slice.userData.isOpen = true;
-      slice.userData.targetLift = 1.45;
-      slice.userData.targetPush = 1.1;
-      slice.userData.imagePlane.visible = true;
-      statusEl.textContent = `Slice ${slice.userData.index + 1} opened. Keep cutting the next memory.`;
-    }
-  }
-
-  if (slices.every((slice) => slice.userData.isOpen)) {
-    statusEl.textContent = 'All 8 memories are revealed.';
-  }
-}
-
-function analyzeStroke() {
-  if (currentStrokeAngles.length < 2) return;
-  for (let boundary = 0; boundary < SLICE_COUNT; boundary += 1) {
-    const boundaryAngle = boundary * SLICE_ANGLE;
-    for (const a of currentStrokeAngles) {
-      let diff = Math.atan2(Math.sin(a - boundaryAngle), Math.cos(a - boundaryAngle));
-      diff = Math.abs(diff);
-      if (diff < CUT_TOLERANCE) {
-        markBoundaryCut(boundary);
-        break;
-      }
-    }
-  }
-  updateCompletedSlices();
-}
-
-function setPointer(event) {
-  const rect = canvas.getBoundingClientRect();
-  pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-  pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-  document.body.style.setProperty('--knife-x', `${event.clientX}px`);
-  document.body.style.setProperty('--knife-y', `${event.clientY}px`);
-}
-
-function collectCutPoint(event) {
-  setPointer(event);
-  raycaster.setFromCamera(pointer, camera);
-  if (raycaster.ray.intersectPlane(cutPlane, planeHit)) {
-    const radius = Math.hypot(planeHit.x, planeHit.z);
-    if (radius <= CAKE_RADIUS + 0.2) {
-      currentStrokeAngles.push(Math.atan2(planeHit.z, planeHit.x));
-    }
-  }
-}
-
-canvas.addEventListener('contextmenu', (e) => e.preventDefault());
-
-canvas.addEventListener('pointerdown', (event) => {
-  setPointer(event);
-  if (event.button === 0) {
-    pointerDown = true;
-    currentStrokeAngles = [];
-    document.body.classList.add('cutting');
-    statusEl.textContent = 'Knife down. Swipe across one edge of a slice.';
-    collectCutPoint(event);
-  }
-});
-
-window.addEventListener('pointermove', (event) => {
-  if (!pointerDown) return;
-  collectCutPoint(event);
-});
-
-window.addEventListener('pointerup', () => {
-  if (!pointerDown) return;
-  pointerDown = false;
-  document.body.classList.remove('cutting');
-  analyzeStroke();
-  currentStrokeAngles = [];
-});
-
-resetButton.addEventListener('click', () => {
-  for (let i = 0; i < cutBoundaries.length; i += 1) cutBoundaries[i] = false;
-  for (const slice of slices) {
-    slice.userData.isOpen = false;
-    slice.userData.targetLift = 0;
-    slice.userData.targetPush = 0;
-    slice.userData.imagePlane.visible = false;
-    slice.userData.cutHighlight.material.opacity = 0;
-  }
-  statusEl.textContent = 'Cake reset. Swipe one cut line, then the matching second line.';
-});
-
-async function buildScene() {
+function buildCake(memoryTextures) {
   for (let i = 0; i < SLICE_COUNT; i += 1) {
-    const tex = await loadMemoryTexture(i);
-    createCakeSlice(i, tex);
+    const startAngle = i * SLICE_ANGLE;
+    const endAngle = startAngle + SLICE_ANGLE;
+
+    const outerGroup = new THREE.Group();
+    outerGroup.userData.index = i;
+
+    const shape = createSliceShape(startAngle, endAngle, CAKE_RADIUS);
+
+    const geometry = new THREE.ExtrudeGeometry(shape, {
+      depth: CAKE_HEIGHT,
+      bevelEnabled: false,
+      curveSegments: 36
+    });
+
+    geometry.rotateX(Math.PI / 2);
+    geometry.translate(0, CAKE_HEIGHT, 0);
+
+    const materials = [
+      new THREE.MeshStandardMaterial({
+        map: creamTexture,
+        roughness: 0.72,
+        metalness: 0,
+        side: THREE.DoubleSide
+      }),
+      new THREE.MeshStandardMaterial({
+        color: 0xffdff0,
+        roughness: 0.58,
+        metalness: 0.02
+      }),
+      new THREE.MeshStandardMaterial({
+        map: spongeTexture,
+        roughness: 0.85,
+        metalness: 0,
+        side: THREE.DoubleSide
+      })
+    ];
+
+    const mesh = new THREE.Mesh(geometry, materials);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    outerGroup.add(mesh);
+
+    const imgPlane = imagePlaneForSlice(startAngle, endAngle, memoryTextures[i]);
+    imgPlane.visible = false;
+    outerGroup.add(imgPlane);
+
+    const radialCenter = (startAngle + endAngle) / 2;
+    outerGroup.userData.radialCenter = radialCenter;
+    outerGroup.userData.startAngle = startAngle;
+    outerGroup.userData.endAngle = endAngle;
+    outerGroup.userData.imagePlane = imgPlane;
+    outerGroup.userData.state = {
+      cutA: false,
+      cutB: false,
+      opened: false,
+      lift: 0
+    };
+
+    cakeRoot.add(outerGroup);
+    slices.push(outerGroup);
   }
-  addCandles();
-  addBoardDecor();
-  statusEl.textContent = 'Ready. Use right-click drag to orbit, then left-click drag to cut a slice edge.';
+
+  addTopDecoration();
 }
 
-function resize() {
-  const width = canvas.clientWidth;
-  const height = canvas.clientHeight;
-  renderer.setSize(width, height, false);
-  camera.aspect = width / height;
+function addTopDecoration() {
+  const topY = CAKE_HEIGHT + 0.08;
+
+  const dollops = 24;
+  for (let i = 0; i < dollops; i += 1) {
+    const a = (i / dollops) * Math.PI * 2;
+    const x = Math.cos(a) * (CAKE_RADIUS * 0.84);
+    const z = Math.sin(a) * (CAKE_RADIUS * 0.84);
+
+    const dollop = new THREE.Mesh(
+      new THREE.SphereGeometry(0.16, 14, 14),
+      new THREE.MeshStandardMaterial({
+        color: 0xffeef7,
+        roughness: 0.44
+      })
+    );
+    dollop.scale.y = 0.8;
+    dollop.position.set(x, topY, z);
+    dollop.castShadow = true;
+    cakeRoot.add(dollop);
+  }
+
+  const candleCount = 12;
+  for (let i = 0; i < candleCount; i += 1) {
+    const a = (i / candleCount) * Math.PI * 2;
+    const r = CAKE_RADIUS * 0.63;
+    const candle = makeCandle(i % 2 === 0 ? 0xffd2ea : 0xfff1b8);
+    candle.position.set(Math.cos(a) * r, topY, Math.sin(a) * r);
+    cakeRoot.add(candle);
+  }
+
+  const letters = ["m", "a", "m", "a"];
+  const spacing = 0.52;
+  const startX = -spacing * 1.5;
+
+  letters.forEach((letter, index) => {
+    const topper = makeLetterTopper(letter);
+    topper.position.set(startX + index * spacing, topY + 0.08, 0);
+    cakeRoot.add(topper);
+  });
+}
+
+function angleFromScreenPosition(clientX, clientY) {
+  const rect = renderer.domElement.getBoundingClientRect();
+  const x = ((clientX - rect.left) / rect.width) * 2 - 1;
+  const y = -((clientY - rect.top) / rect.height) * 2 + 1;
+
+  const raycaster = new THREE.Raycaster();
+  raycaster.setFromCamera({ x, y }, camera);
+
+  const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  const point = new THREE.Vector3();
+  raycaster.ray.intersectPlane(plane, point);
+
+  return Math.atan2(point.z, point.x);
+}
+
+function normalizeAngle(a) {
+  let value = a % (Math.PI * 2);
+  if (value < 0) value += Math.PI * 2;
+  return value;
+}
+
+function smallestAngleDiff(a, b) {
+  let diff = normalizeAngle(a) - normalizeAngle(b);
+  while (diff > Math.PI) diff -= Math.PI * 2;
+  while (diff < -Math.PI) diff += Math.PI * 2;
+  return Math.abs(diff);
+}
+
+let isLeftDragging = false;
+let lastDragAngle = null;
+let lastCutTime = 0;
+
+function updateStatus(text) {
+  statusText.textContent = text;
+}
+
+function tryCutAtAngle(worldAngle) {
+  const now = performance.now();
+  if (now - lastCutTime < 120) return;
+  lastCutTime = now;
+
+  const localAngle = normalizeAngle(worldAngle);
+
+  let bestSlice = null;
+  let bestSide = null;
+  let bestDistance = Infinity;
+
+  for (let i = 0; i < slices.length; i += 1) {
+    const slice = slices[i];
+    const data = slice.userData;
+    const state = data.state;
+
+    if (state.opened) continue;
+
+    const dStart = smallestAngleDiff(localAngle, data.startAngle);
+    const dEnd = smallestAngleDiff(localAngle, data.endAngle);
+    const threshold = 0.17;
+
+    if (dStart < threshold && dStart < bestDistance) {
+      bestDistance = dStart;
+      bestSlice = slice;
+      bestSide = "A";
+    }
+
+    if (dEnd < threshold && dEnd < bestDistance) {
+      bestDistance = dEnd;
+      bestSlice = slice;
+      bestSide = "B";
+    }
+  }
+
+  if (!bestSlice) return;
+
+  const state = bestSlice.userData.state;
+
+  if (bestSide === "A" && !state.cutA) {
+    state.cutA = true;
+    updateStatus(`Slice ${bestSlice.userData.index + 1}: first side cut. Now cut the other side.`);
+    return;
+  }
+
+  if (bestSide === "B" && !state.cutB) {
+    state.cutB = true;
+    updateStatus(`Slice ${bestSlice.userData.index + 1}: first side cut. Now cut the other side.`);
+    return;
+  }
+
+  if (state.cutA && state.cutB && !state.opened) {
+    state.opened = true;
+    state.lift = 0.001;
+    bestSlice.userData.imagePlane.visible = true;
+    animatedSlices.push(bestSlice);
+    updateStatus(`Slice ${bestSlice.userData.index + 1} opened.`);
+  }
+}
+
+renderer.domElement.addEventListener("contextmenu", (event) => {
+  event.preventDefault();
+});
+
+renderer.domElement.addEventListener("pointerdown", (event) => {
+  if (event.button === 0) {
+    isLeftDragging = true;
+    sceneEl.classList.add("knife-mode");
+    lastDragAngle = angleFromScreenPosition(event.clientX, event.clientY);
+  }
+});
+
+window.addEventListener("pointerup", () => {
+  isLeftDragging = false;
+  sceneEl.classList.remove("knife-mode");
+  lastDragAngle = null;
+});
+
+window.addEventListener("pointermove", (event) => {
+  if (!isLeftDragging) return;
+
+  const currentAngle = angleFromScreenPosition(event.clientX, event.clientY);
+
+  if (lastDragAngle !== null) {
+    const delta = smallestAngleDiff(currentAngle, lastDragAngle);
+    if (delta > 0.02) {
+      tryCutAtAngle(currentAngle);
+    }
+  }
+
+  lastDragAngle = currentAngle;
+});
+
+resetBtn.addEventListener("click", () => {
+  for (let i = 0; i < slices.length; i += 1) {
+    const slice = slices[i];
+    slice.position.set(0, 0, 0);
+    slice.rotation.set(0, 0, 0);
+    slice.userData.imagePlane.visible = false;
+    slice.userData.state.cutA = false;
+    slice.userData.state.cutB = false;
+    slice.userData.state.opened = false;
+    slice.userData.state.lift = 0;
+  }
+
+  animatedSlices.length = 0;
+  controls.reset();
+  controls.target.set(0, 1.6, 0);
+  controls.update();
+  updateStatus("Cake reset. Cut one side of a slice to begin.");
+});
+
+function animateSlices() {
+  for (let i = 0; i < animatedSlices.length; i += 1) {
+    const slice = animatedSlices[i];
+    const state = slice.userData.state;
+
+    state.lift = Math.min(state.lift + 0.035, 1);
+
+    const t = state.lift;
+    const angle = slice.userData.radialCenter;
+    const outward = 1.35 * easeOutCubic(t);
+    const up = 0.82 * easeOutCubic(t);
+    const tilt = -0.28 * easeOutCubic(t);
+
+    slice.position.set(
+      Math.cos(angle) * outward,
+      up,
+      Math.sin(angle) * outward
+    );
+    slice.rotation.x = tilt;
+  }
+}
+
+function easeOutCubic(t) {
+  return 1 - Math.pow(1 - t, 3);
+}
+
+function onResize() {
+  camera.aspect = sceneEl.clientWidth / sceneEl.clientHeight;
   camera.updateProjectionMatrix();
+  renderer.setSize(sceneEl.clientWidth, sceneEl.clientHeight);
 }
 
-window.addEventListener('resize', resize);
-resize();
-await buildScene();
+window.addEventListener("resize", onResize);
 
-const clock = new THREE.Clock();
+async function init() {
+  updateStatus("Loading cake...");
+
+  const memoryTextures = await Promise.all(
+    Array.from({ length: SLICE_COUNT }, (_, i) => loadMemoryTexture(i))
+  );
+
+  buildCake(memoryTextures);
+  cakeRoot.position.y = -0.3;
+  updateStatus("Cake ready. Left-drag over one cut edge, then the other edge of the same slice.");
+}
 
 function animate() {
   requestAnimationFrame(animate);
-  const t = clock.getElapsedTime();
   controls.update();
-
-  for (const slice of slices) {
-    slice.userData.lift += (slice.userData.targetLift - slice.userData.lift) * 0.08;
-    slice.userData.push += (slice.userData.targetPush - slice.userData.push) * 0.08;
-
-    const ang = slice.userData.midAngle;
-    slice.position.set(
-      Math.cos(ang) * slice.userData.push,
-      slice.userData.lift,
-      Math.sin(ang) * slice.userData.push
-    );
-
-    if (!slice.userData.isOpen) {
-      slice.userData.cutHighlight.material.opacity *= 0.94;
-    }
-  }
-
-  for (const obj of root.children) {
-    if (obj.type === 'Group' || obj.type === 'Mesh') {
-      if (obj !== plate && obj.parent === root) {
-        obj.rotation.y += obj === cake ? 0 : 0;
-      }
-    }
-  }
-
-  const topper = root.children.find((child) => child.material?.map && child.geometry?.type === 'PlaneGeometry');
-  if (topper) {
-    topper.rotation.z = Math.sin(t * 1.7) * 0.02;
-  }
-
+  animateSlices();
   renderer.render(scene, camera);
 }
 
+init();
 animate();
