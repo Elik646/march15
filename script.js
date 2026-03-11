@@ -394,7 +394,8 @@ function imagePlaneForSlice(startAngle, endAngle, texture) {
   // rotation.x = -PI/2 transforms the XY shape into the XZ plane and makes
   // the normal point upward (+Y) so the camera sees the texture when looking down
   plane.rotation.x = -Math.PI / 2;
-  plane.position.y = 0.06;
+  // Place just above the top frosting face so it faces the camera after a 90° tilt
+  plane.position.y = CAKE_HEIGHT + 0.02;
 
   return plane;
 }
@@ -547,12 +548,6 @@ function buildCake(memoryTextures) {
     sliceGroup.userData.startAngle = startAngle;
     sliceGroup.userData.endAngle = endAngle;
     sliceGroup.userData.imagePlane = imgPlane;
-    // Pre-compute tilt axis (tangential to radial direction) — reused each frame
-    sliceGroup.userData.tiltAxis = new THREE.Vector3(
-      -Math.sin(midAngle),
-      0,
-      Math.cos(midAngle)
-    ).normalize();
     sliceGroup.userData.state = {
       opened: false,
       lift: 0
@@ -562,15 +557,10 @@ function buildCake(memoryTextures) {
     slices.push(sliceGroup);
   }
 
-  // Shared centre dome (stays in cakeRoot)
-  const domeMesh = new THREE.Mesh(
-    new THREE.SphereGeometry(CAKE_RADIUS * 0.48, 48, 12, 0, Math.PI * 2, 0, 0.24),
-    new THREE.MeshStandardMaterial({ color: 0xfff0f8, roughness: 0.36 })
-  );
-  domeMesh.position.y = CAKE_HEIGHT + 0.02;
-  cakeRoot.add(domeMesh);
+  // Shared centre dome removed — it appeared as an unwanted floating circle.
 
-  // Rim of piped cream along the outer top edge (shared ring — stays in cakeRoot)
+  // Rim of piped cream along the outer top edge — distributed to per-slice groups
+  // so each blob rises together with its slice during the reveal animation.
   const rimCount = 48;
   for (let i = 0; i < rimCount; i += 1) {
     const a = (i / rimCount) * Math.PI * 2;
@@ -584,7 +574,9 @@ function buildCake(memoryTextures) {
       CAKE_HEIGHT + 0.04,
       Math.sin(a) * CAKE_RADIUS * 0.97
     );
-    cakeRoot.add(rimBlob);
+    // Assign to the slice whose angular range contains this blob
+    const sliceIdx = Math.floor((i / rimCount) * SLICE_COUNT) % SLICE_COUNT;
+    slices[sliceIdx].add(rimBlob);
   }
 }
 
@@ -598,6 +590,7 @@ const mouseNDC = new THREE.Vector2();
 // Reused each frame to avoid per-frame allocations in the animation loop
 const _cameraXZ = new THREE.Vector3();
 const _tiltQuat = new THREE.Quaternion();
+const _tiltAxis = new THREE.Vector3();
 
 let pointerDownX = 0;
 let pointerDownY = 0;
@@ -712,25 +705,36 @@ function animateSlices() {
 
     if (state.lift >= 1) continue;
 
-    // Slow, smooth rise — 0.011 per frame ≈ ~5 s at 60 fps
-    state.lift = Math.min(state.lift + 0.011, 1);
+    // Slow, smooth rise — 0.009 per frame ≈ ~7 s at 60 fps.
+    // The extra time vs. the old single-phase animation lets both the rise
+    // and the tilt phases each play out at a comfortable, readable pace.
+    state.lift = Math.min(state.lift + 0.009, 1);
     const t = state.lift;
-    const te = easeOutCubic(t);
 
     const angle = slice.userData.radialCenter;
     const cosA = Math.cos(angle);
     const sinA = Math.sin(angle);
 
-    // ---- Rise straight up ----
-    const liftY = 4.6 * te;
+    // ---- Phase 1 (t: 0 → 0.45): rise straight up & separate ----
+    const phase1 = Math.min(t / 0.45, 1);
+    const te1 = easeOutCubic(phase1);
 
-    // ---- Slight radial separation so slice clears its neighbours ----
-    const outward = 0.45 * te;
+    // ---- Phase 2 (t: 0.45 → 1): tilt to vertical & approach camera ----
+    const phase2 = Math.max((t - 0.45) / 0.55, 0);
+    const te2 = easeOutCubic(phase2);
 
-    // ---- Move slice toward the viewer (camera is at +Z and above) ----
-    // We push it gently in the camera's XZ direction to "approach" the screen.
-    _cameraXZ.set(camera.position.x, 0, camera.position.z).normalize();
-    const approachDist = 1.6 * te;
+    // Rise — mostly in phase 1, held steady through phase 2
+    const liftY = 4.8 * te1;
+
+    // Slight radial separation so the slice clears its neighbours
+    const outward = 0.55 * te1;
+
+    // Push the slice toward the camera (XZ direction) during phase 2
+    _cameraXZ.set(camera.position.x, 0, camera.position.z);
+    // Guard against camera being directly above the origin (zero XZ length)
+    if (_cameraXZ.lengthSq() < 1e-6) _cameraXZ.set(0, 0, 1);
+    else _cameraXZ.normalize();
+    const approachDist = 3.0 * te2;
 
     slice.position.set(
       cosA * outward + _cameraXZ.x * approachDist,
@@ -738,24 +742,22 @@ function animateSlices() {
       sinA * outward + _cameraXZ.z * approachDist
     );
 
-    // ---- Scale up: gives the feeling of coming closer to the viewer ----
-    const scale = 1 + 0.42 * easeOutBack(Math.min(t * 1.15, 1));
+    // Gentle uniform scale — gives a "coming closer" feel
+    const scale = 1 + 0.3 * te2;
     slice.scale.setScalar(scale);
 
-    // ---- Gentle tilt toward camera so the bottom face (image) becomes visible ----
-    // The tangential axis is perpendicular to the radial direction in XZ.
-    // A positive angle around it tilts the top of the slice away from camera
-    // and the bottom (image plane) toward the camera.
-    if (t < 1) {
-      const tiltAngle = 0.42 * te;
-      _tiltQuat.setFromAxisAngle(slice.userData.tiltAxis, tiltAngle);
-      slice.quaternion.copy(_tiltQuat);
-    }
+    // ---- Tilt 90° so the top face (image) faces the camera ----
+    // Dynamic axis: perpendicular to both Y and the camera XZ direction.
+    // Rotating around this axis swings local +Y toward the camera direction.
+    _tiltAxis.set(_cameraXZ.z, 0, -_cameraXZ.x); // already unit-length
+    const tiltAngle = (Math.PI / 2) * te2;
+    _tiltQuat.setFromAxisAngle(_tiltAxis, tiltAngle);
+    slice.quaternion.copy(_tiltQuat);
 
-    // ---- Image plane fade-in (starts at 35% of animation) ----
+    // ---- Image plane fade-in (starts midway through phase 2) ----
     const imgPlane = slice.userData.imagePlane;
-    if (t > 0.35) {
-      const fadeT = (t - 0.35) / 0.65;
+    if (phase2 > 0.4) {
+      const fadeT = (phase2 - 0.4) / 0.6;
       imgPlane.material.opacity = Math.min(easeOutCubic(fadeT), 1);
     }
   }
