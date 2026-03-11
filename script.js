@@ -399,17 +399,19 @@ function imagePlaneForSlice(startAngle, endAngle, texture) {
 
   const plane = new THREE.Mesh(geo, mat);
 
-  // The outward normal of the cut face at startAngle is (-sin(startAngle), 0, cos(startAngle)).
-  // A PlaneGeometry faces +Z by default; rotation.y = -startAngle makes it face that direction.
-  plane.rotation.y = -startAngle;
+  // The true outward normal of the startAngle cut face (after extruding and rotating the
+  // geometry into upright position) is (sin(startAngle), 0, -cos(startAngle)).
+  // A PlaneGeometry faces +Z by default; rotation.y = π - startAngle makes it face
+  // exactly that outward direction.
+  plane.rotation.y = Math.PI - startAngle;
 
-  // Nudge the plane outward along the face normal so it sits just in front of
+  // Nudge the plane outward along the correct face normal so it sits just in front of
   // the cut face and avoids z-fighting with the frosting geometry.
   const offset = 0.06;
   plane.position.set(
-    (CAKE_RADIUS / 2) * Math.cos(startAngle) + offset * (-Math.sin(startAngle)),
+    (CAKE_RADIUS / 2) * Math.cos(startAngle) + offset * Math.sin(startAngle),
     CAKE_HEIGHT / 2,
-    (CAKE_RADIUS / 2) * Math.sin(startAngle) + offset * Math.cos(startAngle)
+    (CAKE_RADIUS / 2) * Math.sin(startAngle) - offset * Math.cos(startAngle)
   );
 
   return plane;
@@ -683,14 +685,16 @@ renderer.domElement.addEventListener("click", (e) => {
   targetSlice.userData.state.lift = 0.001;
 
   // Compute the Y rotation needed so the inner cut face (at startAngle) faces the camera.
-  // The outward normal of the startAngle cut face, after rotating the slice group by r around Y,
-  // becomes (sin(startAngle - r), 0, cos(startAngle - r)).  For it to align with the camera
-  // direction (atan2(cx, cz) = camAngle), we need r = startAngle + camAngle.
+  // The true outward normal of the startAngle face is (sin(startAngle), 0, -cos(startAngle)).
+  // After rotating the slice group by θ around Y that normal becomes (sin(camAngle), 0, cos(camAngle))
+  // (pointing toward camera) when θ = startAngle + camAngle - π.
+  // Normalise to (-π, π] to prevent spinning more than 180°.
   _cameraXZ.set(camera.position.x, 0, camera.position.z);
   if (_cameraXZ.lengthSq() < 1e-6) _cameraXZ.set(0, 0, 1);
   else _cameraXZ.normalize();
   const camAngle = Math.atan2(_cameraXZ.x, _cameraXZ.z);
-  targetSlice.userData.state.targetYRotation = targetSlice.userData.startAngle + camAngle;
+  const rawRot = targetSlice.userData.startAngle + camAngle - Math.PI;
+  targetSlice.userData.state.targetYRotation = Math.atan2(Math.sin(rawRot), Math.cos(rawRot));
 
   if (!animatedSlices.includes(targetSlice)) animatedSlices.push(targetSlice);
 
@@ -795,10 +799,6 @@ function animateSlices() {
       0,
       sinA * outward + _cameraXZ.z * approachDist
     );
-
-    // Gentle uniform scale — gives a "coming closer" feel
-    const scale = 1 + 0.45 * te2;
-    slice.scale.setScalar(scale);
 
     // ---- Rotate around Y so the inner cut face faces the camera ----
     // targetYRotation was computed at click time from the camera azimuth.
