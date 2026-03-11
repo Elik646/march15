@@ -26,6 +26,7 @@ const camera = new THREE.PerspectiveCamera(
 );
 camera.position.set(0, 8.4, 12.5);
 
+// LEFT drag now rotates; click reveals slices
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.enablePan = false;
@@ -33,16 +34,16 @@ controls.enableZoom = false;
 controls.minPolarAngle = 0.7;
 controls.maxPolarAngle = 1.35;
 controls.mouseButtons = {
-  LEFT: null,
+  LEFT: THREE.MOUSE.ROTATE,
   MIDDLE: THREE.MOUSE.ROTATE,
   RIGHT: THREE.MOUSE.ROTATE
 };
 controls.target.set(0, 1.6, 0);
 
-const ambient = new THREE.AmbientLight(0xffffff, 1.35);
+const ambient = new THREE.AmbientLight(0xffffff, 1.4);
 scene.add(ambient);
 
-const keyLight = new THREE.DirectionalLight(0xffffff, 1.6);
+const keyLight = new THREE.DirectionalLight(0xfff8f0, 1.7);
 keyLight.position.set(8, 14, 10);
 keyLight.castShadow = true;
 keyLight.shadow.mapSize.width = 2048;
@@ -55,9 +56,13 @@ keyLight.shadow.camera.top = 14;
 keyLight.shadow.camera.bottom = -14;
 scene.add(keyLight);
 
-const rimLight = new THREE.DirectionalLight(0xffd7ee, 0.9);
+const rimLight = new THREE.DirectionalLight(0xffd7ee, 0.85);
 rimLight.position.set(-8, 7, -10);
 scene.add(rimLight);
+
+const fillLight = new THREE.DirectionalLight(0xfff0e0, 0.5);
+fillLight.position.set(0, -4, 8);
+scene.add(fillLight);
 
 const group = new THREE.Group();
 scene.add(group);
@@ -71,16 +76,13 @@ floor.position.y = -1.06;
 floor.receiveShadow = true;
 scene.add(floor);
 
+// Cake stand
 const cakeStand = new THREE.Group();
 group.add(cakeStand);
 
 const standPlate = new THREE.Mesh(
   new THREE.CylinderGeometry(4.9, 5.3, 0.35, 64),
-  new THREE.MeshStandardMaterial({
-    color: 0xf9f6fb,
-    roughness: 0.45,
-    metalness: 0.05
-  })
+  new THREE.MeshStandardMaterial({ color: 0xf9f6fb, roughness: 0.45, metalness: 0.05 })
 );
 standPlate.position.y = -0.68;
 standPlate.receiveShadow = true;
@@ -89,11 +91,7 @@ cakeStand.add(standPlate);
 
 const standStem = new THREE.Mesh(
   new THREE.CylinderGeometry(1.2, 1.5, 0.7, 48),
-  new THREE.MeshStandardMaterial({
-    color: 0xf3edf7,
-    roughness: 0.55,
-    metalness: 0.04
-  })
+  new THREE.MeshStandardMaterial({ color: 0xf3edf7, roughness: 0.55, metalness: 0.04 })
 );
 standStem.position.y = -1.18;
 standStem.castShadow = true;
@@ -102,11 +100,7 @@ cakeStand.add(standStem);
 
 const standBase = new THREE.Mesh(
   new THREE.CylinderGeometry(2.8, 3.5, 0.36, 56),
-  new THREE.MeshStandardMaterial({
-    color: 0xf6f0f8,
-    roughness: 0.5,
-    metalness: 0.04
-  })
+  new THREE.MeshStandardMaterial({ color: 0xf6f0f8, roughness: 0.5, metalness: 0.04 })
 );
 standBase.position.y = -1.65;
 standBase.castShadow = true;
@@ -123,61 +117,81 @@ const SLICE_ANGLE = (Math.PI * 2) / SLICE_COUNT;
 
 const slices = [];
 const animatedSlices = [];
-const indicatorLines = [];
-const pulsingIndicatorSet = new Set();
-const _flipAxis = new THREE.Vector3();
-const _flipQuat = new THREE.Quaternion();
 
-function createCreamTexture() {
+// ---------------------------------------------------------------------------
+// Textures — improved to look more like real cake
+// ---------------------------------------------------------------------------
+
+function createFrostingTexture() {
   const canvas = document.createElement("canvas");
   canvas.width = 1024;
-  canvas.height = 128;
+  canvas.height = 256;
   const ctx = canvas.getContext("2d");
 
-  const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
-  grad.addColorStop(0, "#ffe7f1");
-  grad.addColorStop(0.45, "#ffd7ea");
-  grad.addColorStop(1, "#ffc3df");
+  // Smooth cream base
+  const grad = ctx.createLinearGradient(0, 0, 0, 256);
+  grad.addColorStop(0, "#fff9fd");
+  grad.addColorStop(0.45, "#fde6f2");
+  grad.addColorStop(1, "#f9cfea");
   ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillRect(0, 0, 1024, 256);
 
-  for (let x = 0; x < canvas.width; x += 26) {
-    const h = 16 + Math.sin(x * 0.05) * 6;
-    ctx.fillStyle = "rgba(255,255,255,0.35)";
-    ctx.beginPath();
-    ctx.arc(x, 20 + h * 0.2, 10, 0, Math.PI * 2);
-    ctx.fill();
+  // Vertical piping strokes
+  for (let x = 0; x < 1024; x += 18) {
+    const gx = ctx.createLinearGradient(x - 9, 0, x + 9, 0);
+    gx.addColorStop(0, "rgba(255,255,255,0)");
+    gx.addColorStop(0.5, "rgba(255,255,255,0.42)");
+    gx.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = gx;
+    ctx.fillRect(x - 9, 0, 18, 256);
   }
 
-  for (let x = 0; x < canvas.width; x += 36) {
-    ctx.fillStyle = "rgba(255,255,255,0.22)";
-    ctx.beginPath();
-    ctx.arc(x + 10, 62, 8, 0, Math.PI * 2);
-    ctx.fill();
-  }
+  // Soft highlight band at top
+  const topHighlight = ctx.createLinearGradient(0, 0, 0, 28);
+  topHighlight.addColorStop(0, "rgba(255,255,255,0.5)");
+  topHighlight.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = topHighlight;
+  ctx.fillRect(0, 0, 1024, 28);
 
   const tex = new THREE.CanvasTexture(canvas);
   tex.wrapS = THREE.RepeatWrapping;
-  tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(1.35, 1);
+  tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.repeat.set(2.2, 1);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
 }
 
 function createSpongeTexture() {
   const canvas = document.createElement("canvas");
-  canvas.width = 1024;
+  canvas.width = 512;
   canvas.height = 512;
   const ctx = canvas.getContext("2d");
 
-  ctx.fillStyle = "#e8b07d";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  // Warm golden-brown sponge base
+  ctx.fillStyle = "#c8783a";
+  ctx.fillRect(0, 0, 512, 512);
 
-  for (let i = 0; i < 2400; i += 1) {
-    const x = Math.random() * canvas.width;
-    const y = Math.random() * canvas.height;
-    const r = 1 + Math.random() * 5;
-    ctx.fillStyle = Math.random() > 0.5 ? "rgba(184,115,68,0.22)" : "rgba(255,231,191,0.22)";
+  // Cream filling layers at 1/3 and 2/3 height
+  [170, 340].forEach((y) => {
+    const lg = ctx.createLinearGradient(0, y - 15, 0, y + 15);
+    lg.addColorStop(0, "rgba(245,205,140,0)");
+    lg.addColorStop(0.3, "rgba(255,238,185,0.95)");
+    lg.addColorStop(0.5, "rgba(255,250,225,1)");
+    lg.addColorStop(0.7, "rgba(255,238,185,0.95)");
+    lg.addColorStop(1, "rgba(245,205,140,0)");
+    ctx.fillStyle = lg;
+    ctx.fillRect(0, y - 15, 512, 30);
+  });
+
+  // Sponge crumb texture
+  for (let i = 0; i < 3200; i += 1) {
+    const x = Math.random() * 512;
+    const y = Math.random() * 512;
+    const r = 0.5 + Math.random() * 2.8;
+    ctx.fillStyle =
+      Math.random() > 0.5
+        ? `rgba(160,85,28,${0.12 + Math.random() * 0.18})`
+        : `rgba(235,185,105,${0.1 + Math.random() * 0.15})`;
     ctx.beginPath();
     ctx.arc(x, y, r, 0, Math.PI * 2);
     ctx.fill();
@@ -190,9 +204,48 @@ function createSpongeTexture() {
   return tex;
 }
 
-const creamTexture = createCreamTexture();
+function createTopFrostingTexture() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 512;
+  canvas.height = 512;
+  const ctx = canvas.getContext("2d");
+
+  const grad = ctx.createRadialGradient(256, 256, 0, 256, 256, 280);
+  grad.addColorStop(0, "#fff0f9");
+  grad.addColorStop(0.6, "#fde0f0");
+  grad.addColorStop(1, "#f9cee8");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 512, 512);
+
+  // Swirl / piped rosette effect
+  for (let i = 0; i < 80; i += 1) {
+    const angle = (i / 80) * Math.PI * 2;
+    const r = 60 + Math.random() * 160;
+    const x = 256 + Math.cos(angle) * r;
+    const z = 256 + Math.sin(angle) * r;
+    const size = 10 + Math.random() * 22;
+    const g = ctx.createRadialGradient(x, z, 0, x, z, size);
+    g.addColorStop(0, "rgba(255,255,255,0.55)");
+    g.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(x, z, size, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+const frostingTexture = createFrostingTexture();
 const spongeTexture = createSpongeTexture();
+const topFrostingTexture = createTopFrostingTexture();
 const textureLoader = new THREE.TextureLoader();
+
+// ---------------------------------------------------------------------------
+// Memory texture loader
+// ---------------------------------------------------------------------------
 
 function loadMemoryTexture(index) {
   const extensions = ["jpg", "jpeg", "png", "svg"];
@@ -200,6 +253,7 @@ function loadMemoryTexture(index) {
   function tryLoad(extIndex) {
     return new Promise((resolve) => {
       if (extIndex >= extensions.length) {
+        // Fallback placeholder
         const canvas = document.createElement("canvas");
         canvas.width = 900;
         canvas.height = 700;
@@ -211,7 +265,7 @@ function loadMemoryTexture(index) {
         ctx.fillStyle = grad;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        ctx.fillStyle = "rgba(255,255,255,0.55)";
+        ctx.fillStyle = "rgba(255,255,255,0.5)";
         for (let i = 0; i < 18; i += 1) {
           ctx.beginPath();
           ctx.arc(
@@ -255,15 +309,16 @@ function loadMemoryTexture(index) {
   return tryLoad(0);
 }
 
+// ---------------------------------------------------------------------------
+// Candle
+// ---------------------------------------------------------------------------
+
 function makeCandle(color = 0xffd4ea) {
   const candle = new THREE.Group();
 
   const body = new THREE.Mesh(
     new THREE.CylinderGeometry(0.07, 0.08, 0.58, 16),
-    new THREE.MeshStandardMaterial({
-      color,
-      roughness: 0.55
-    })
+    new THREE.MeshStandardMaterial({ color, roughness: 0.55 })
   );
   body.castShadow = true;
   body.position.y = 0.29;
@@ -277,29 +332,38 @@ function makeCandle(color = 0xffd4ea) {
   candle.add(wick);
 
   const flame = new THREE.Mesh(
-    new THREE.SphereGeometry(0.06, 12, 12),
-    new THREE.MeshBasicMaterial({
-      color: 0xffc25a
-    })
+    new THREE.SphereGeometry(0.065, 12, 12),
+    new THREE.MeshBasicMaterial({ color: 0xffc25a })
   );
   flame.position.y = 0.72;
-  flame.scale.set(0.85, 1.25, 0.85);
+  flame.scale.set(0.85, 1.3, 0.85);
   candle.add(flame);
 
-  const glow = new THREE.PointLight(0xffbd66, 0.4, 1.5, 2);
+  // Inner bright flame core
+  const flameCore = new THREE.Mesh(
+    new THREE.SphereGeometry(0.032, 8, 8),
+    new THREE.MeshBasicMaterial({ color: 0xfff4a0 })
+  );
+  flameCore.position.y = 0.715;
+  candle.add(flameCore);
+
+  const glow = new THREE.PointLight(0xffbd66, 0.45, 1.6, 2);
   glow.position.y = 0.72;
   candle.add(glow);
 
   return candle;
 }
 
+// ---------------------------------------------------------------------------
+// Geometry helpers
+// ---------------------------------------------------------------------------
 
 function createSliceShape(startAngle, endAngle, radius) {
   const shape = new THREE.Shape();
   shape.moveTo(0, 0);
   shape.lineTo(Math.cos(startAngle) * radius, Math.sin(startAngle) * radius);
 
-  const steps = 30;
+  const steps = 32;
   for (let i = 1; i <= steps; i += 1) {
     const t = i / steps;
     const a = startAngle + (endAngle - startAngle) * t;
@@ -310,156 +374,128 @@ function createSliceShape(startAngle, endAngle, radius) {
   return shape;
 }
 
+// ---------------------------------------------------------------------------
+// Image plane — horizontal sector at y=0 of slice, facing UP
+// Visible from above when the slice is raised above the rest of the cake
+// ---------------------------------------------------------------------------
+
 function imagePlaneForSlice(startAngle, endAngle, texture) {
-  // Use a pie-sector shape matching the slice footprint.
-  // The ShapeGeometry is in local XY; rotation.x = PI/2 maps it to local XZ
-  // so it lies flat at the bottom of the slice, facing down (-Y in local space).
-  // After the flip animation (180° around the tangential axis) it faces up.
-  const shape = createSliceShape(startAngle, endAngle, CAKE_RADIUS * 0.96);
-  const geo = new THREE.ShapeGeometry(shape, 32);
+  const shape = createSliceShape(startAngle, endAngle, CAKE_RADIUS * 0.97);
+  const geo = new THREE.ShapeGeometry(shape, 36);
 
-  const plane = new THREE.Mesh(
-    geo,
-    new THREE.MeshBasicMaterial({
-      map: texture,
-      side: THREE.DoubleSide
-    })
-  );
+  const mat = new THREE.MeshBasicMaterial({
+    map: texture,
+    side: THREE.DoubleSide,
+    transparent: true,
+    opacity: 0
+  });
 
-  // Lay flat in XZ plane, just above the base of the slice
-  plane.rotation.x = Math.PI / 2;
-  plane.position.y = 0.04;
+  const plane = new THREE.Mesh(geo, mat);
+  // rotation.x = -PI/2 transforms the XY shape into the XZ plane and makes
+  // the normal point upward (+Y) so the camera sees the texture when looking down
+  plane.rotation.x = -Math.PI / 2;
+  plane.position.y = 0.06;
 
   return plane;
 }
 
-function addSliceIndicators() {
-  for (let i = 0; i < SLICE_COUNT; i += 1) {
-    const angle = i * SLICE_ANGLE;
-    const cosA = Math.cos(angle);
-    const sinA = Math.sin(angle);
+// ---------------------------------------------------------------------------
+// Per-slice decorations (candles, dollops, drips) — added to each slice group
+// so they travel with the slice during the reveal animation
+// ---------------------------------------------------------------------------
 
-    // Each indicator gets its own material so it can be highlighted independently
-    const mat = new THREE.MeshStandardMaterial({
-      color: 0xb05070,
-      roughness: 0.3,
-      metalness: 0.05,
-      transparent: true,
-      opacity: 0.85,
-      emissive: new THREE.Color(0x000000),
-      emissiveIntensity: 0
-    });
+function addSliceDecorations(sliceGroup, sliceIndex) {
+  const topY = CAKE_HEIGHT + 0.08;
+  const startAngle = sliceIndex * SLICE_ANGLE;
+  const endAngle = startAngle + SLICE_ANGLE;
 
-    const lineLen = CAKE_RADIUS * 0.95;
-    const lineGeo = new THREE.BoxGeometry(lineLen, 0.03, 0.052);
-    const lineMesh = new THREE.Mesh(lineGeo, mat);
-    lineMesh.position.set(
-      cosA * (lineLen / 2),
-      CAKE_HEIGHT + 0.022,
-      sinA * (lineLen / 2)
-    );
-    lineMesh.rotation.y = -angle;
-    cakeRoot.add(lineMesh);
-
-    const notchGeo = new THREE.BoxGeometry(0.055, CAKE_HEIGHT * 0.38, 0.055);
-    const notchMesh = new THREE.Mesh(notchGeo, mat);
-    notchMesh.position.set(
-      cosA * (CAKE_RADIUS - 0.04),
-      CAKE_HEIGHT * 0.62,
-      sinA * (CAKE_RADIUS - 0.04)
-    );
-    cakeRoot.add(notchMesh);
-
-    indicatorLines[i] = { line: lineMesh, notch: notchMesh, material: mat };
-  }
-}
-
-function highlightIndicator(sliceIndex, side) {
-  const boundaryIdx = side === "A" ? sliceIndex : (sliceIndex + 1) % SLICE_COUNT;
-  const otherBoundaryIdx = side === "A" ? (sliceIndex + 1) % SLICE_COUNT : sliceIndex;
-
-  // Mark the cut boundary as gold
-  const ind = indicatorLines[boundaryIdx];
-  if (ind) {
-    ind.material.color.setHex(0xffcc00);
-    ind.material.emissive.setHex(0xffaa00);
-    ind.material.emissiveIntensity = 0.6;
-    pulsingIndicatorSet.delete(boundaryIdx);
-  }
-
-  // Check if the other side is still uncut – if so, pulse it to guide the user
-  const slice = slices[sliceIndex];
-  const state = slice.userData.state;
-  const otherAlreadyCut = side === "A" ? state.cutB : state.cutA;
-
-  if (!otherAlreadyCut) {
-    const otherInd = indicatorLines[otherBoundaryIdx];
-    if (otherInd && !pulsingIndicatorSet.has(otherBoundaryIdx)) {
-      pulsingIndicatorSet.add(otherBoundaryIdx);
-      otherInd.material.color.setHex(0xff8822);
-      otherInd.material.emissive.setHex(0xff6600);
-    }
-  } else {
-    // Both sides now cut – stop pulsing the other boundary too
-    pulsingIndicatorSet.delete(otherBoundaryIdx);
-    const otherInd = indicatorLines[otherBoundaryIdx];
-    if (otherInd) {
-      otherInd.material.color.setHex(0xffcc00);
-      otherInd.material.emissive.setHex(0xffaa00);
-      otherInd.material.emissiveIntensity = 0.6;
-    }
-  }
-}
-
-function animateIndicators() {
-  if (pulsingIndicatorSet.size === 0) return;
-  const t = performance.now();
-  const pulse = 0.3 + 0.55 * Math.abs(Math.sin(t * 0.0035));
-  for (const idx of pulsingIndicatorSet) {
-    const ind = indicatorLines[idx];
-    if (ind) {
-      ind.material.emissiveIntensity = pulse;
-    }
-  }
-}
-
-function addFrostingDrips() {
   const dripMat = new THREE.MeshStandardMaterial({
-    color: 0xfff0f6,
-    roughness: 0.25,
-    metalness: 0.0
+    color: 0xfff2f7,
+    roughness: 0.22,
+    metalness: 0
   });
 
-  const dripCount = 30;
-  for (let i = 0; i < dripCount; i += 1) {
-    const a = (i / dripCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.18;
-    const dripLen = 0.2 + Math.random() * 0.5;
-    const dripR = 0.07 + Math.random() * 0.045;
+  // ---- Dollops (3 per slice along outer ring) ----
+  for (let j = 0; j < 3; j += 1) {
+    const t = (j + 0.5) / 3;
+    const a = startAngle + t * SLICE_ANGLE;
+    const x = Math.cos(a) * (CAKE_RADIUS * 0.84);
+    const z = Math.sin(a) * (CAKE_RADIUS * 0.84);
+
+    const dollop = new THREE.Mesh(
+      new THREE.SphereGeometry(0.17, 14, 14),
+      new THREE.MeshStandardMaterial({ color: 0xfff0f8, roughness: 0.42 })
+    );
+    dollop.scale.set(1, 0.78, 1);
+    dollop.position.set(x, topY, z);
+    dollop.castShadow = true;
+    sliceGroup.add(dollop);
+  }
+
+  // ---- Candles (2 per slice) ----
+  const candleOffsets = [0.28, 0.72];
+  candleOffsets.forEach((t, ci) => {
+    const a = startAngle + t * SLICE_ANGLE;
+    const r = CAKE_RADIUS * 0.63;
+    const candle = makeCandle(ci === 0 ? 0xffd2ea : 0xfff1b8);
+    candle.position.set(Math.cos(a) * r, topY, Math.sin(a) * r);
+    sliceGroup.add(candle);
+  });
+
+  // ---- Frosting drips (4 per slice along outer edge) ----
+  for (let j = 0; j < 4; j += 1) {
+    const t = (j + 0.5 + (Math.random() - 0.5) * 0.35) / 4;
+    const a = startAngle + t * SLICE_ANGLE;
+    const dripLen = 0.22 + Math.random() * 0.46;
+    const dripR = 0.072 + Math.random() * 0.042;
 
     const drip = new THREE.Mesh(
       new THREE.CapsuleGeometry(dripR, dripLen, 4, 8),
       dripMat
     );
 
-    const r = CAKE_RADIUS * (0.9 + Math.random() * 0.08);
-    // Position so the top of the capsule sits at CAKE_HEIGHT (top edge)
+    const r = CAKE_RADIUS * (0.91 + Math.random() * 0.06);
     drip.position.set(
       Math.cos(a) * r,
       CAKE_HEIGHT - dripLen / 2 - dripR,
       Math.sin(a) * r
     );
     drip.castShadow = true;
-    cakeRoot.add(drip);
+    sliceGroup.add(drip);
+  }
+
+  // ---- Small berry/sprinkle accent on top ----
+  const berryColors = [0xff6b8a, 0xc0392b, 0xe74c6f, 0xff8fab];
+  for (let j = 0; j < 2; j += 1) {
+    const t = (j + 0.35 + Math.random() * 0.3) / 2;
+    const a = startAngle + t * SLICE_ANGLE;
+    const r = CAKE_RADIUS * (0.45 + Math.random() * 0.3);
+    const berry = new THREE.Mesh(
+      new THREE.SphereGeometry(0.1 + Math.random() * 0.06, 10, 10),
+      new THREE.MeshStandardMaterial({
+        color: berryColors[Math.floor(Math.random() * berryColors.length)],
+        roughness: 0.35,
+        metalness: 0.05
+      })
+    );
+    berry.position.set(Math.cos(a) * r, topY + 0.08, Math.sin(a) * r);
+    berry.castShadow = true;
+    sliceGroup.add(berry);
   }
 }
+
+// ---------------------------------------------------------------------------
+// Build cake
+// ---------------------------------------------------------------------------
 
 function buildCake(memoryTextures) {
   for (let i = 0; i < SLICE_COUNT; i += 1) {
     const startAngle = i * SLICE_ANGLE;
     const endAngle = startAngle + SLICE_ANGLE;
+    const midAngle = (startAngle + endAngle) / 2;
 
-    const outerGroup = new THREE.Group();
-    outerGroup.userData.index = i;
+    const sliceGroup = new THREE.Group();
+    sliceGroup.userData.index = i;
 
     const shape = createSliceShape(startAngle, endAngle, CAKE_RADIUS);
 
@@ -472,21 +508,24 @@ function buildCake(memoryTextures) {
     geometry.rotateX(Math.PI / 2);
     geometry.translate(0, CAKE_HEIGHT, 0);
 
+    // material[0] = extruded walls (outer frosting + cut faces)
+    // material[1] = top cap (after rotation & translation: the top face)
+    // material[2] = bottom cap (bottom face, usually hidden by stand)
     const materials = [
       new THREE.MeshStandardMaterial({
-        map: creamTexture,
-        roughness: 0.72,
+        map: frostingTexture,
+        roughness: 0.62,
         metalness: 0,
         side: THREE.DoubleSide
       }),
       new THREE.MeshStandardMaterial({
-        color: 0xffdff0,
-        roughness: 0.58,
-        metalness: 0.02
+        map: topFrostingTexture,
+        roughness: 0.5,
+        metalness: 0
       }),
       new THREE.MeshStandardMaterial({
         map: spongeTexture,
-        roughness: 0.85,
+        roughness: 0.88,
         metalness: 0,
         side: THREE.DoubleSide
       })
@@ -495,271 +534,176 @@ function buildCake(memoryTextures) {
     const mesh = new THREE.Mesh(geometry, materials);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
-    outerGroup.add(mesh);
+    sliceGroup.add(mesh);
 
+    // Image plane at y=0 of slice (the "inside" revealed when slice is lifted)
     const imgPlane = imagePlaneForSlice(startAngle, endAngle, memoryTextures[i]);
-    imgPlane.visible = false;
-    outerGroup.add(imgPlane);
+    sliceGroup.add(imgPlane);
 
-    const radialCenter = (startAngle + endAngle) / 2;
-    outerGroup.userData.radialCenter = radialCenter;
-    outerGroup.userData.startAngle = startAngle;
-    outerGroup.userData.endAngle = endAngle;
-    outerGroup.userData.imagePlane = imgPlane;
-    outerGroup.userData.state = {
-      cutA: false,
-      cutB: false,
+    // Decorations belonging to this slice
+    addSliceDecorations(sliceGroup, i);
+
+    sliceGroup.userData.radialCenter = midAngle;
+    sliceGroup.userData.startAngle = startAngle;
+    sliceGroup.userData.endAngle = endAngle;
+    sliceGroup.userData.imagePlane = imgPlane;
+    // Pre-compute tilt axis (tangential to radial direction) — reused each frame
+    sliceGroup.userData.tiltAxis = new THREE.Vector3(
+      -Math.sin(midAngle),
+      0,
+      Math.cos(midAngle)
+    ).normalize();
+    sliceGroup.userData.state = {
       opened: false,
       lift: 0
     };
 
-    cakeRoot.add(outerGroup);
-    slices.push(outerGroup);
+    cakeRoot.add(sliceGroup);
+    slices.push(sliceGroup);
   }
 
-  addTopDecoration();
-}
-
-function addTopDecoration() {
-  const topY = CAKE_HEIGHT + 0.08;
-
-  // Subtle frosted dome in the centre
+  // Shared centre dome (stays in cakeRoot)
   const domeMesh = new THREE.Mesh(
-    new THREE.SphereGeometry(CAKE_RADIUS * 0.55, 48, 12, 0, Math.PI * 2, 0, 0.22),
-    new THREE.MeshStandardMaterial({ color: 0xffeef7, roughness: 0.38 })
+    new THREE.SphereGeometry(CAKE_RADIUS * 0.48, 48, 12, 0, Math.PI * 2, 0, 0.24),
+    new THREE.MeshStandardMaterial({ color: 0xfff0f8, roughness: 0.36 })
   );
   domeMesh.position.y = CAKE_HEIGHT + 0.02;
   cakeRoot.add(domeMesh);
 
-  const dollops = 24;
-  for (let i = 0; i < dollops; i += 1) {
-    const a = (i / dollops) * Math.PI * 2;
-    const x = Math.cos(a) * (CAKE_RADIUS * 0.84);
-    const z = Math.sin(a) * (CAKE_RADIUS * 0.84);
-
-    const dollop = new THREE.Mesh(
-      new THREE.SphereGeometry(0.16, 14, 14),
-      new THREE.MeshStandardMaterial({
-        color: 0xffeef7,
-        roughness: 0.44
-      })
+  // Rim of piped cream along the outer top edge (shared ring — stays in cakeRoot)
+  const rimCount = 48;
+  for (let i = 0; i < rimCount; i += 1) {
+    const a = (i / rimCount) * Math.PI * 2;
+    const rimBlob = new THREE.Mesh(
+      new THREE.SphereGeometry(0.12, 10, 10),
+      new THREE.MeshStandardMaterial({ color: 0xffeef7, roughness: 0.4 })
     );
-    dollop.scale.y = 0.8;
-    dollop.position.set(x, topY, z);
-    dollop.castShadow = true;
-    cakeRoot.add(dollop);
+    rimBlob.scale.y = 0.7;
+    rimBlob.position.set(
+      Math.cos(a) * CAKE_RADIUS * 0.97,
+      CAKE_HEIGHT + 0.04,
+      Math.sin(a) * CAKE_RADIUS * 0.97
+    );
+    cakeRoot.add(rimBlob);
   }
-
-  const candleCount = 12;
-  for (let i = 0; i < candleCount; i += 1) {
-    const a = (i / candleCount) * Math.PI * 2;
-    const r = CAKE_RADIUS * 0.63;
-    const candle = makeCandle(i % 2 === 0 ? 0xffd2ea : 0xfff1b8);
-    candle.position.set(Math.cos(a) * r, topY, Math.sin(a) * r);
-    cakeRoot.add(candle);
-  }
-
-  addFrostingDrips();
-  addSliceIndicators();
 }
 
-function angleFromScreenPosition(clientX, clientY) {
+// ---------------------------------------------------------------------------
+// Click-to-reveal interaction
+// ---------------------------------------------------------------------------
+
+const raycaster = new THREE.Raycaster();
+const mouseNDC = new THREE.Vector2();
+
+// Reused each frame to avoid per-frame allocations in the animation loop
+const _cameraXZ = new THREE.Vector3();
+const _tiltQuat = new THREE.Quaternion();
+
+let pointerDownX = 0;
+let pointerDownY = 0;
+let didDrag = false;
+const DRAG_THRESHOLD_SQ = 36; // 6px²
+
+renderer.domElement.addEventListener("pointerdown", (e) => {
+  if (e.button !== 0) return;
+  pointerDownX = e.clientX;
+  pointerDownY = e.clientY;
+  didDrag = false;
+});
+
+window.addEventListener("pointermove", (e) => {
+  const dx = e.clientX - pointerDownX;
+  const dy = e.clientY - pointerDownY;
+  if (dx * dx + dy * dy > DRAG_THRESHOLD_SQ) {
+    didDrag = true;
+  }
+});
+
+renderer.domElement.addEventListener("click", (e) => {
+  if (didDrag) return;
+
   const rect = renderer.domElement.getBoundingClientRect();
-  const x = ((clientX - rect.left) / rect.width) * 2 - 1;
-  const y = -((clientY - rect.top) / rect.height) * 2 + 1;
+  mouseNDC.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+  mouseNDC.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
 
-  const raycaster = new THREE.Raycaster();
-  raycaster.setFromCamera({ x, y }, camera);
+  raycaster.setFromCamera(mouseNDC, camera);
 
-  const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-  const point = new THREE.Vector3();
-  raycaster.ray.intersectPlane(plane, point);
-
-  return Math.atan2(point.z, point.x);
-}
-
-function normalizeAngle(a) {
-  let value = a % (Math.PI * 2);
-  if (value < 0) value += Math.PI * 2;
-  return value;
-}
-
-function smallestAngleDiff(a, b) {
-  let diff = normalizeAngle(a) - normalizeAngle(b);
-  while (diff > Math.PI) diff -= Math.PI * 2;
-  while (diff < -Math.PI) diff += Math.PI * 2;
-  return Math.abs(diff);
-}
-
-let rotateKeyHeld = false;
-
-window.addEventListener("keydown", (e) => {
-  if (e.key === "Control" || e.key === "Meta") {
-    rotateKeyHeld = true;
+  // Collect all meshes of unrevealed slices
+  const meshTargets = [];
+  for (const slice of slices) {
+    if (slice.userData.state.opened) continue;
+    slice.traverse((child) => {
+      if (child.isMesh) meshTargets.push(child);
+    });
   }
-});
 
-window.addEventListener("keyup", (e) => {
-  if (e.key === "Control" || e.key === "Meta") {
-    rotateKeyHeld = false;
-  }
-});
+  const hits = raycaster.intersectObjects(meshTargets, false);
+  if (hits.length === 0) return;
 
-let isCtrlDragging = false;
-let isLeftDragging = false;
-let lastDragAngle = null;
-let lastCutTime = 0;
-const ROTATION_SENSITIVITY = 0.008;
-// Angular tolerance (radians) for registering a drag as a cut on a slice boundary.
-// ~12.6° — wide enough to be comfortable, narrow enough to not span two boundaries.
-const CUT_THRESHOLD = 0.22;
-// Fraction of the animation at which the rise phase ends and the flip begins.
-const FLIP_PHASE_START = 0.45;
+  const hitMesh = hits[0].object;
 
-function updateStatus(text) {
-  statusText.textContent = text;
-}
-
-function tryCutAtAngle(worldAngle) {
-  const now = performance.now();
-  if (now - lastCutTime < 120) return;
-  lastCutTime = now;
-
-  const localAngle = normalizeAngle(worldAngle - group.rotation.y);
-
-  let bestSlice = null;
-  let bestSide = null;
-  let bestDistance = Infinity;
-
-  for (let i = 0; i < slices.length; i += 1) {
-    const slice = slices[i];
-    const data = slice.userData;
-    const state = data.state;
-
-    if (state.opened) continue;
-
-    const dStart = smallestAngleDiff(localAngle, data.startAngle);
-    const dEnd = smallestAngleDiff(localAngle, data.endAngle);
-    const threshold = CUT_THRESHOLD;
-
-    if (dStart < threshold && dStart < bestDistance) {
-      bestDistance = dStart;
-      bestSlice = slice;
-      bestSide = "A";
-    }
-
-    if (dEnd < threshold && dEnd < bestDistance) {
-      bestDistance = dEnd;
-      bestSlice = slice;
-      bestSide = "B";
+  // Map hit mesh back to its slice group
+  let targetSlice = null;
+  for (const slice of slices) {
+    if (slice.userData.state.opened) continue;
+    let found = false;
+    slice.traverse((child) => {
+      if (child === hitMesh) found = true;
+    });
+    if (found) {
+      targetSlice = slice;
+      break;
     }
   }
 
-  if (!bestSlice) return;
+  if (!targetSlice) return;
 
-  const state = bestSlice.userData.state;
-  let madeCut = false;
+  targetSlice.userData.state.opened = true;
+  targetSlice.userData.state.lift = 0.001;
+  animatedSlices.push(targetSlice);
 
-  if (bestSide === "A" && !state.cutA) {
-    state.cutA = true;
-    madeCut = true;
-    highlightIndicator(bestSlice.userData.index, "A");
-  }
-
-  if (bestSide === "B" && !state.cutB) {
-    state.cutB = true;
-    madeCut = true;
-    highlightIndicator(bestSlice.userData.index, "B");
-  }
-
-  if (!madeCut) return;
-
-  if (state.cutA && state.cutB && !state.opened) {
-    state.opened = true;
-    state.lift = 0.001;
-    animatedSlices.push(bestSlice);
-    updateStatus(`Slice ${bestSlice.userData.index + 1} released! Watch it flip!`);
-  } else {
-    updateStatus(`Slice ${bestSlice.userData.index + 1}: one side cut — now cut the other side.`);
-  }
-}
-
-renderer.domElement.addEventListener("contextmenu", (event) => {
-  event.preventDefault();
+  const remaining = slices.filter((s) => !s.userData.state.opened).length;
+  updateStatus(
+    `Memory ${targetSlice.userData.index + 1} revealed! ✨  ${remaining} slice${remaining !== 1 ? "s" : ""} left.`
+  );
 });
 
-renderer.domElement.addEventListener("pointerdown", (event) => {
-  if (event.button === 0) {
-    if (rotateKeyHeld) {
-      isCtrlDragging = true;
-      sceneEl.classList.add("rotate-mode");
-    } else {
-      isLeftDragging = true;
-      sceneEl.classList.add("knife-mode");
-      lastDragAngle = angleFromScreenPosition(event.clientX, event.clientY);
-    }
-  }
-});
-
-window.addEventListener("pointerup", () => {
-  isLeftDragging = false;
-  isCtrlDragging = false;
-  sceneEl.classList.remove("knife-mode");
-  sceneEl.classList.remove("rotate-mode");
-  lastDragAngle = null;
-});
-
-window.addEventListener("pointermove", (event) => {
-  if (isCtrlDragging) {
-    group.rotation.y += event.movementX * ROTATION_SENSITIVITY;
-    return;
-  }
-
-  if (!isLeftDragging) return;
-
-  const currentAngle = angleFromScreenPosition(event.clientX, event.clientY);
-
-  if (lastDragAngle !== null) {
-    const delta = smallestAngleDiff(currentAngle, lastDragAngle);
-    if (delta > 0.02) {
-      tryCutAtAngle(currentAngle);
-    }
-  }
-
-  lastDragAngle = currentAngle;
-});
+// ---------------------------------------------------------------------------
+// Reset
+// ---------------------------------------------------------------------------
 
 resetBtn.addEventListener("click", () => {
   group.rotation.y = 0;
 
-  for (let i = 0; i < slices.length; i += 1) {
-    const slice = slices[i];
+  for (const slice of slices) {
     slice.position.set(0, 0, 0);
     slice.rotation.set(0, 0, 0);
-    slice.userData.imagePlane.visible = false;
-    slice.userData.state.cutA = false;
-    slice.userData.state.cutB = false;
+    slice.scale.setScalar(1);
+    slice.userData.imagePlane.material.opacity = 0;
     slice.userData.state.opened = false;
     slice.userData.state.lift = 0;
-  }
-
-  // Reset all indicator colours
-  pulsingIndicatorSet.clear();
-  for (let i = 0; i < indicatorLines.length; i += 1) {
-    const ind = indicatorLines[i];
-    if (ind) {
-      ind.material.color.setHex(0xb05070);
-      ind.material.emissive.setHex(0x000000);
-      ind.material.emissiveIntensity = 0;
-    }
   }
 
   animatedSlices.length = 0;
   controls.reset();
   controls.target.set(0, 1.6, 0);
   controls.update();
-  updateStatus("Cake reset. Cut one side of a slice to begin.");
+  updateStatus("Cake reset — click on any slice to reveal a memory! 🎂");
 });
+
+// ---------------------------------------------------------------------------
+// Slice reveal animation
+// ---------------------------------------------------------------------------
+
+function easeOutCubic(t) {
+  return 1 - Math.pow(1 - t, 3);
+}
+
+function easeOutBack(t) {
+  const c1 = 1.70158;
+  const c3 = c1 + 1;
+  return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+}
 
 function animateSlices() {
   for (let i = 0; i < animatedSlices.length; i += 1) {
@@ -768,43 +712,66 @@ function animateSlices() {
 
     if (state.lift >= 1) continue;
 
-    state.lift = Math.min(state.lift + 0.022, 1);
+    // Slow, smooth rise — 0.011 per frame ≈ ~5 s at 60 fps
+    state.lift = Math.min(state.lift + 0.011, 1);
     const t = state.lift;
+    const te = easeOutCubic(t);
 
     const angle = slice.userData.radialCenter;
     const cosA = Math.cos(angle);
     const sinA = Math.sin(angle);
 
-    const PHASE1 = FLIP_PHASE_START;
+    // ---- Rise straight up ----
+    const liftY = 4.6 * te;
 
-    if (t <= PHASE1) {
-      // Phase 1: rise and move outward
-      const p = easeOutCubic(t / PHASE1);
-      slice.position.set(cosA * 1.8 * p, 1.6 * p, sinA * 1.8 * p);
-      slice.quaternion.identity();
-    } else {
-      // Phase 2: flip 180° around the tangential axis
-      const p = easeOutCubic((t - PHASE1) / (1 - PHASE1));
-      const flipAngle = Math.PI * p;
+    // ---- Slight radial separation so slice clears its neighbours ----
+    const outward = 0.45 * te;
 
-      slice.position.set(cosA * 1.8, 1.6 - 0.25 * p, sinA * 1.8);
+    // ---- Move slice toward the viewer (camera is at +Z and above) ----
+    // We push it gently in the camera's XZ direction to "approach" the screen.
+    _cameraXZ.set(camera.position.x, 0, camera.position.z).normalize();
+    const approachDist = 1.6 * te;
 
-      // Tangential axis is perpendicular to the radial direction in XZ
-      _flipAxis.set(-sinA, 0, cosA);
-      _flipQuat.setFromAxisAngle(_flipAxis, flipAngle);
-      slice.quaternion.copy(_flipQuat);
+    slice.position.set(
+      cosA * outward + _cameraXZ.x * approachDist,
+      liftY,
+      sinA * outward + _cameraXZ.z * approachDist
+    );
 
-      // Reveal the image once the flip is roughly halfway done
-      if (p > 0.45 && !slice.userData.imagePlane.visible) {
-        slice.userData.imagePlane.visible = true;
-      }
+    // ---- Scale up: gives the feeling of coming closer to the viewer ----
+    const scale = 1 + 0.42 * easeOutBack(Math.min(t * 1.15, 1));
+    slice.scale.setScalar(scale);
+
+    // ---- Gentle tilt toward camera so the bottom face (image) becomes visible ----
+    // The tangential axis is perpendicular to the radial direction in XZ.
+    // A positive angle around it tilts the top of the slice away from camera
+    // and the bottom (image plane) toward the camera.
+    if (t < 1) {
+      const tiltAngle = 0.42 * te;
+      _tiltQuat.setFromAxisAngle(slice.userData.tiltAxis, tiltAngle);
+      slice.quaternion.copy(_tiltQuat);
+    }
+
+    // ---- Image plane fade-in (starts at 35% of animation) ----
+    const imgPlane = slice.userData.imagePlane;
+    if (t > 0.35) {
+      const fadeT = (t - 0.35) / 0.65;
+      imgPlane.material.opacity = Math.min(easeOutCubic(fadeT), 1);
     }
   }
 }
 
-function easeOutCubic(t) {
-  return 1 - Math.pow(1 - t, 3);
+// ---------------------------------------------------------------------------
+// Status helper
+// ---------------------------------------------------------------------------
+
+function updateStatus(text) {
+  statusText.textContent = text;
 }
+
+// ---------------------------------------------------------------------------
+// Resize
+// ---------------------------------------------------------------------------
 
 function onResize() {
   camera.aspect = sceneEl.clientWidth / sceneEl.clientHeight;
@@ -814,8 +781,12 @@ function onResize() {
 
 window.addEventListener("resize", onResize);
 
+// ---------------------------------------------------------------------------
+// Init & render loop
+// ---------------------------------------------------------------------------
+
 async function init() {
-  updateStatus("Loading cake...");
+  updateStatus("Preparing the cake…");
 
   const memoryTextures = await Promise.all(
     Array.from({ length: SLICE_COUNT }, (_, i) => loadMemoryTexture(i))
@@ -823,14 +794,13 @@ async function init() {
 
   buildCake(memoryTextures);
   cakeRoot.position.y = -0.3;
-  updateStatus("Cake ready. Left-drag over one cut edge, then the other edge of the same slice.");
+  updateStatus("Click on any slice to reveal a memory! 🎂");
 }
 
 function animate() {
   requestAnimationFrame(animate);
   controls.update();
   animateSlices();
-  animateIndicators();
   renderer.render(scene, camera);
 }
 
