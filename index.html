@@ -1,48 +1,53 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>3D Memory Cake</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="styles.css" />
-    <script async src="https://unpkg.com/es-module-shims@1.10.0/dist/es-module-shims.js"></script>
-    <script type="importmap">
-      {
-        "imports": {
-          "three": "https://unpkg.com/three@0.161.0/build/three.module.js",
-          "three/addons/": "https://unpkg.com/three@0.161.0/examples/jsm/"
-        }
-      }
-    </script>
-  </head>
-  <body>
-    <div class="app-shell">
-      <div class="hero">
-        <p class="eyebrow">Interactive 3D memory cake</p>
-        <h1>Cut the cake like it’s real.</h1>
-        <p class="subtitle">
-          Right mouse button rotates the cake. Left mouse button is your knife. Swipe one cut line,
-          then the second cut line of the same slice to lift it and reveal a memory photo inside.
-        </p>
-        <div class="controls">
-          <span>🖱️ RMB: rotate</span>
-          <span>🔪 LMB drag: cut</span>
-          <span>✨ 8 slices total</span>
-        </div>
-      </div>
+<head>
+  <meta charset="UTF-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  />
+  <title>3D Memory Cake</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Inter:wght@400;500;600&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="page-bg"></div>
 
-      <div class="scene-wrap">
-        <canvas id="scene"></canvas>
-        <div class="hud">
-          <div class="hud-card" id="status">Slice a side of the cake to start.</div>
-          <button id="resetButton" type="button">Reset cake</button>
-        </div>
-      </div>
+  <header class="hero">
+    <p class="eyebrow">INTERACTIVE 3D MEMORY CAKE</p>
+    <h1>Cut the cake like it’s real.</h1>
+    <p class="sub">
+      Right mouse button rotates the cake. Left mouse drag is your knife.
+      Cut both sides of the same slice to lift it and reveal the memory inside.
+    </p>
+
+    <div class="legend">
+      <span>🖱️ RMB drag: rotate</span>
+      <span>🔪 LMB drag: cut</span>
+      <span>🎂 8 slices total</span>
     </div>
+  </header>
 
-    <script type="module" src="script.js"></script>
-  </body>
+  <main class="app-shell">
+    <aside class="ui-panel">
+      <div class="status-card">
+        <div class="status-title">Status</div>
+        <div id="statusText">Cut one side of a slice to begin.</div>
+      </div>
+
+      <button id="resetBtn" type="button">Reset cake</button>
+    </aside>
+
+    <section class="canvas-wrap">
+      <div id="scene"></div>
+    </section>
+  </main>
+
+  <script type="module" src="script.js"></script>
+</body>
 </html>
