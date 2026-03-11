@@ -375,13 +375,13 @@ function createSliceShape(startAngle, endAngle, radius) {
 }
 
 // ---------------------------------------------------------------------------
-// Image plane — horizontal sector at y=0 of slice, facing UP
-// Visible from above when the slice is raised above the rest of the cake
+// Image plane — vertical rectangle on the inner cut face at startAngle,
+// facing outward so the camera sees it when the slice rotates to reveal.
 // ---------------------------------------------------------------------------
 
 function imagePlaneForSlice(startAngle, endAngle, texture) {
-  const shape = createSliceShape(startAngle, endAngle, CAKE_RADIUS * 0.97);
-  const geo = new THREE.ShapeGeometry(shape, 36);
+  // Use a rectangular plane covering the inner cut face (width = CAKE_RADIUS, height = CAKE_HEIGHT)
+  const geo = new THREE.PlaneGeometry(CAKE_RADIUS * 0.92, CAKE_HEIGHT * 0.92);
 
   const mat = new THREE.MeshBasicMaterial({
     map: texture,
@@ -391,11 +391,20 @@ function imagePlaneForSlice(startAngle, endAngle, texture) {
   });
 
   const plane = new THREE.Mesh(geo, mat);
-  // rotation.x = -PI/2 transforms the XY shape into the XZ plane and makes
-  // the normal point upward (+Y) so the camera sees the texture when looking down
-  plane.rotation.x = -Math.PI / 2;
-  // Place just above the top frosting face so it faces the camera after a 90° tilt
-  plane.position.y = CAKE_HEIGHT + 0.02;
+
+  // The outward normal of the cut face at startAngle is (-sin(startAngle), 0, cos(startAngle)).
+  // A PlaneGeometry faces +Z by default; rotation.y = -startAngle makes it face that direction.
+  plane.rotation.y = -startAngle;
+
+  // Tiny outward offset (in the face's outward normal direction) to avoid z-fighting
+  // with the cake geometry. The normal is (-sin, 0, cos) for the face at startAngle.
+  const offset = 0.01;
+  plane.position.set(
+    // Center of the cut face radially, then nudge outward along the face normal
+    (CAKE_RADIUS / 2) * Math.cos(startAngle) + offset * (-Math.sin(startAngle)),
+    CAKE_HEIGHT / 2,
+    (CAKE_RADIUS / 2) * Math.sin(startAngle) + offset * Math.cos(startAngle)
+  );
 
   return plane;
 }
@@ -550,7 +559,9 @@ function buildCake(memoryTextures) {
     sliceGroup.userData.imagePlane = imgPlane;
     sliceGroup.userData.state = {
       opened: false,
-      lift: 0
+      lift: 0,
+      closing: false,
+      targetYRotation: 0
     };
 
     cakeRoot.add(sliceGroup);
@@ -589,13 +600,12 @@ const mouseNDC = new THREE.Vector2();
 
 // Reused each frame to avoid per-frame allocations in the animation loop
 const _cameraXZ = new THREE.Vector3();
-const _tiltQuat = new THREE.Quaternion();
-const _tiltAxis = new THREE.Vector3();
 
 let pointerDownX = 0;
 let pointerDownY = 0;
 let didDrag = false;
 const DRAG_THRESHOLD_SQ = 36; // 6px²
+let openSlice = null; // the slice that is currently open or opening
 
 renderer.domElement.addEventListener("pointerdown", (e) => {
   if (e.button !== 0) return;
@@ -651,11 +661,33 @@ renderer.domElement.addEventListener("click", (e) => {
 
   if (!targetSlice) return;
 
-  targetSlice.userData.state.opened = true;
-  targetSlice.userData.state.lift = 0.001;
-  animatedSlices.push(targetSlice);
+  // Ignore clicks on a slice that is already opening or open
+  if (targetSlice.userData.state.opened) return;
 
-  const remaining = slices.filter((s) => !s.userData.state.opened).length;
+  // Close the previously open slice so only one is revealed at a time
+  if (openSlice && openSlice !== targetSlice) {
+    openSlice.userData.state.closing = true;
+    if (!animatedSlices.includes(openSlice)) animatedSlices.push(openSlice);
+  }
+
+  openSlice = targetSlice;
+  targetSlice.userData.state.opened = true;
+  targetSlice.userData.state.closing = false;
+  targetSlice.userData.state.lift = 0.001;
+
+  // Compute the Y rotation needed so the inner cut face (at startAngle) faces the camera.
+  // The outward normal of the startAngle cut face, after rotating the slice group by r around Y,
+  // becomes (sin(startAngle - r), 0, cos(startAngle - r)).  For it to align with the camera
+  // direction (atan2(cx, cz) = camAngle), we need r = startAngle + camAngle.
+  _cameraXZ.set(camera.position.x, 0, camera.position.z);
+  if (_cameraXZ.lengthSq() < 1e-6) _cameraXZ.set(0, 0, 1);
+  else _cameraXZ.normalize();
+  const camAngle = Math.atan2(_cameraXZ.x, _cameraXZ.z);
+  targetSlice.userData.state.targetYRotation = targetSlice.userData.startAngle + camAngle;
+
+  if (!animatedSlices.includes(targetSlice)) animatedSlices.push(targetSlice);
+
+  const remaining = SLICE_COUNT - slices.filter((s) => s.userData.state.opened).length;
   updateStatus(
     `Memory ${targetSlice.userData.index + 1} revealed! ✨  ${remaining} slice${remaining !== 1 ? "s" : ""} left.`
   );
@@ -667,6 +699,7 @@ renderer.domElement.addEventListener("click", (e) => {
 
 resetBtn.addEventListener("click", () => {
   group.rotation.y = 0;
+  openSlice = null;
 
   for (const slice of slices) {
     slice.position.set(0, 0, 0);
@@ -675,6 +708,7 @@ resetBtn.addEventListener("click", () => {
     slice.userData.imagePlane.material.opacity = 0;
     slice.userData.state.opened = false;
     slice.userData.state.lift = 0;
+    slice.userData.state.closing = false;
   }
 
   animatedSlices.length = 0;
@@ -699,16 +733,32 @@ function easeOutBack(t) {
 }
 
 function animateSlices() {
-  for (let i = 0; i < animatedSlices.length; i += 1) {
+  for (let i = animatedSlices.length - 1; i >= 0; i -= 1) {
     const slice = animatedSlices[i];
     const state = slice.userData.state;
 
-    if (state.lift >= 1) continue;
+    if (state.closing) {
+      // Animate back to original position (faster return than opening)
+      state.lift = Math.max(state.lift - 0.012, 0);
 
-    // Slow, smooth rise — 0.009 per frame ≈ ~7 s at 60 fps.
-    // The extra time vs. the old single-phase animation lets both the rise
-    // and the tilt phases each play out at a comfortable, readable pace.
-    state.lift = Math.min(state.lift + 0.009, 1);
+      if (state.lift === 0) {
+        // Fully returned — reset everything
+        slice.position.set(0, 0, 0);
+        slice.rotation.set(0, 0, 0);
+        slice.scale.setScalar(1);
+        slice.userData.imagePlane.material.opacity = 0;
+        state.opened = false;
+        state.closing = false;
+        animatedSlices.splice(i, 1);
+        continue;
+      }
+    } else {
+      if (state.lift >= 1) continue; // fully open, nothing to do
+
+      // Slow, smooth rise — 0.009 per frame ≈ ~7 s at 60 fps
+      state.lift = Math.min(state.lift + 0.009, 1);
+    }
+
     const t = state.lift;
 
     const angle = slice.userData.radialCenter;
@@ -719,7 +769,7 @@ function animateSlices() {
     const phase1 = Math.min(t / 0.45, 1);
     const te1 = easeOutCubic(phase1);
 
-    // ---- Phase 2 (t: 0.45 → 1): tilt to vertical & approach camera ----
+    // ---- Phase 2 (t: 0.45 → 1): rotate Y and approach camera ----
     const phase2 = Math.max((t - 0.45) / 0.55, 0);
     const te2 = easeOutCubic(phase2);
 
@@ -731,7 +781,6 @@ function animateSlices() {
 
     // Push the slice toward the camera (XZ direction) during phase 2
     _cameraXZ.set(camera.position.x, 0, camera.position.z);
-    // Guard against camera being directly above the origin (zero XZ length)
     if (_cameraXZ.lengthSq() < 1e-6) _cameraXZ.set(0, 0, 1);
     else _cameraXZ.normalize();
     const approachDist = 3.0 * te2;
@@ -746,19 +795,18 @@ function animateSlices() {
     const scale = 1 + 0.3 * te2;
     slice.scale.setScalar(scale);
 
-    // ---- Tilt 90° so the top face (image) faces the camera ----
-    // Dynamic axis: perpendicular to both Y and the camera XZ direction.
-    // Rotating around this axis swings local +Y toward the camera direction.
-    _tiltAxis.set(_cameraXZ.z, 0, -_cameraXZ.x); // already unit-length
-    const tiltAngle = (Math.PI / 2) * te2;
-    _tiltQuat.setFromAxisAngle(_tiltAxis, tiltAngle);
-    slice.quaternion.copy(_tiltQuat);
+    // ---- Rotate around Y so the inner cut face faces the camera ----
+    // targetYRotation was computed at click time from the camera azimuth.
+    const targetRot = state.targetYRotation;
+    slice.rotation.set(0, targetRot * te2, 0);
 
-    // ---- Image plane fade-in (starts midway through phase 2) ----
+    // ---- Image plane fade-in (starts midway through phase 2, only when opening) ----
     const imgPlane = slice.userData.imagePlane;
-    if (phase2 > 0.4) {
+    if (!state.closing && phase2 > 0.4) {
       const fadeT = (phase2 - 0.4) / 0.6;
       imgPlane.material.opacity = Math.min(easeOutCubic(fadeT), 1);
+    } else {
+      imgPlane.material.opacity = 0;
     }
   }
 }
