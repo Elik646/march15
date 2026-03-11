@@ -177,6 +177,14 @@ body {
   cursor: crosshair;
 }
 
+#scene.rotate-mode {
+  cursor: grab;
+}
+
+#scene.rotate-mode:active {
+  cursor: grabbing;
+}
+
 #scene canvas {
   display: block;
   width: 100%;

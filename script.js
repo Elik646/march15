@@ -289,42 +289,6 @@ function makeCandle(color = 0xffd4ea) {
   return candle;
 }
 
-function makeLetterTopper(letter) {
-  const canvas = document.createElement("canvas");
-  canvas.width = 256;
-  canvas.height = 256;
-  const ctx = canvas.getContext("2d");
-
-  ctx.clearRect(0, 0, 256, 256);
-  ctx.fillStyle = "#8f4b6c";
-  ctx.font = "bold 200px 'Cormorant Garamond'";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(letter, 128, 140);
-
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-
-  const mat = new THREE.SpriteMaterial({
-    map: tex,
-    transparent: true
-  });
-
-  const sprite = new THREE.Sprite(mat);
-  sprite.scale.set(0.65, 0.65, 0.65);
-
-  const holder = new THREE.Group();
-  holder.add(sprite);
-
-  const stick = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.01, 0.01, 0.42, 8),
-    new THREE.MeshStandardMaterial({ color: 0xf8e5ef })
-  );
-  stick.position.y = -0.28;
-  holder.add(stick);
-
-  return holder;
-}
 
 function createSliceShape(startAngle, endAngle, radius) {
   const shape = new THREE.Shape();
@@ -368,6 +332,43 @@ function imagePlaneForSlice(startAngle, endAngle, texture) {
   );
 
   return plane;
+}
+
+function addSliceIndicators() {
+  const indicatorMat = new THREE.MeshStandardMaterial({
+    color: 0xb05070,
+    roughness: 0.3,
+    metalness: 0.05,
+    transparent: true,
+    opacity: 0.82
+  });
+
+  for (let i = 0; i < SLICE_COUNT; i += 1) {
+    const angle = i * SLICE_ANGLE;
+    const cosA = Math.cos(angle);
+    const sinA = Math.sin(angle);
+
+    const lineLen = CAKE_RADIUS * 0.95;
+    const lineGeo = new THREE.BoxGeometry(lineLen, 0.03, 0.048);
+    const lineMesh = new THREE.Mesh(lineGeo, indicatorMat);
+    lineMesh.position.set(
+      cosA * (lineLen / 2),
+      CAKE_HEIGHT + 0.022,
+      sinA * (lineLen / 2)
+    );
+    lineMesh.rotation.y = -angle;
+    lineMesh.castShadow = false;
+    cakeRoot.add(lineMesh);
+
+    const notchGeo = new THREE.BoxGeometry(0.055, CAKE_HEIGHT * 0.38, 0.055);
+    const notchMesh = new THREE.Mesh(notchGeo, indicatorMat);
+    notchMesh.position.set(
+      cosA * (CAKE_RADIUS - 0.04),
+      CAKE_HEIGHT * 0.62,
+      sinA * (CAKE_RADIUS - 0.04)
+    );
+    cakeRoot.add(notchMesh);
+  }
 }
 
 function buildCake(memoryTextures) {
@@ -468,15 +469,7 @@ function addTopDecoration() {
     cakeRoot.add(candle);
   }
 
-  const letters = ["m", "a", "m", "a"];
-  const spacing = 0.52;
-  const startX = -spacing * 1.5;
-
-  letters.forEach((letter, index) => {
-    const topper = makeLetterTopper(letter);
-    topper.position.set(startX + index * spacing, topY + 0.08, 0);
-    cakeRoot.add(topper);
-  });
+  addSliceIndicators();
 }
 
 function angleFromScreenPosition(clientX, clientY) {
@@ -512,20 +505,20 @@ let rotateKeyHeld = false;
 window.addEventListener("keydown", (e) => {
   if (e.key === "Control" || e.key === "Meta") {
     rotateKeyHeld = true;
-    controls.mouseButtons.LEFT = THREE.MOUSE.ROTATE;
   }
 });
 
 window.addEventListener("keyup", (e) => {
   if (e.key === "Control" || e.key === "Meta") {
     rotateKeyHeld = false;
-    controls.mouseButtons.LEFT = null;
   }
 });
 
+let isCtrlDragging = false;
 let isLeftDragging = false;
 let lastDragAngle = null;
 let lastCutTime = 0;
+const ROTATION_SENSITIVITY = 0.008;
 
 function updateStatus(text) {
   statusText.textContent = text;
@@ -536,7 +529,7 @@ function tryCutAtAngle(worldAngle) {
   if (now - lastCutTime < 120) return;
   lastCutTime = now;
 
-  const localAngle = normalizeAngle(worldAngle);
+  const localAngle = normalizeAngle(worldAngle - group.rotation.y);
 
   let bestSlice = null;
   let bestSide = null;
@@ -596,20 +589,32 @@ renderer.domElement.addEventListener("contextmenu", (event) => {
 });
 
 renderer.domElement.addEventListener("pointerdown", (event) => {
-  if (event.button === 0 && !rotateKeyHeld) {
-    isLeftDragging = true;
-    sceneEl.classList.add("knife-mode");
-    lastDragAngle = angleFromScreenPosition(event.clientX, event.clientY);
+  if (event.button === 0) {
+    if (rotateKeyHeld) {
+      isCtrlDragging = true;
+      sceneEl.classList.add("rotate-mode");
+    } else {
+      isLeftDragging = true;
+      sceneEl.classList.add("knife-mode");
+      lastDragAngle = angleFromScreenPosition(event.clientX, event.clientY);
+    }
   }
 });
 
 window.addEventListener("pointerup", () => {
   isLeftDragging = false;
+  isCtrlDragging = false;
   sceneEl.classList.remove("knife-mode");
+  sceneEl.classList.remove("rotate-mode");
   lastDragAngle = null;
 });
 
 window.addEventListener("pointermove", (event) => {
+  if (isCtrlDragging) {
+    group.rotation.y += event.movementX * ROTATION_SENSITIVITY;
+    return;
+  }
+
   if (!isLeftDragging) return;
 
   const currentAngle = angleFromScreenPosition(event.clientX, event.clientY);
@@ -625,6 +630,8 @@ window.addEventListener("pointermove", (event) => {
 });
 
 resetBtn.addEventListener("click", () => {
+  group.rotation.y = 0;
+
   for (let i = 0; i < slices.length; i += 1) {
     const slice = slices[i];
     slice.position.set(0, 0, 0);
