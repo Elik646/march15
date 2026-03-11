@@ -382,39 +382,62 @@ function createSliceShape(startAngle, endAngle, radius) {
 }
 
 // ---------------------------------------------------------------------------
-// Image plane — vertical rectangle on the inner cut face at startAngle,
-// facing outward so the camera sees it when the slice rotates to reveal.
+// Image planes — one rectangle on each cut face of the slice (startAngle and
+// endAngle), so the photo is visible from any camera angle as the slice slides out.
 // ---------------------------------------------------------------------------
 
-function imagePlaneForSlice(startAngle, endAngle, texture) {
-  // Plane covers the inner cut face (width = CAKE_RADIUS, height = CAKE_HEIGHT)
-  const geo = new THREE.PlaneGeometry(CAKE_RADIUS * 0.95, CAKE_HEIGHT * 0.95);
+function imagePlanesForSlice(startAngle, endAngle, texture) {
+  // Nudge each plane slightly in front of its cut face to avoid z-fighting.
+  const FACE_OFFSET = 0.04;
+  // Scale factor so the image doesn't quite reach the cake edges.
+  const IMAGE_SCALE = 0.9;
+  const planes = [];
 
-  const mat = new THREE.MeshBasicMaterial({
-    map: texture,
-    side: THREE.DoubleSide,
-    transparent: true,
-    opacity: 0
-  });
+  // ---- Face at startAngle ----
+  // Outward normal: (sin(startAngle), 0, -cos(startAngle))
+  // A PlaneGeometry faces +Z; rotation.y = π - startAngle aligns the normal.
+  {
+    const geo = new THREE.PlaneGeometry(CAKE_RADIUS * IMAGE_SCALE, CAKE_HEIGHT * IMAGE_SCALE);
+    const mat = new THREE.MeshBasicMaterial({
+      map: texture,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false
+    });
+    const plane = new THREE.Mesh(geo, mat);
+    plane.rotation.y = Math.PI - startAngle;
+    plane.position.set(
+      (CAKE_RADIUS / 2) * Math.cos(startAngle) + FACE_OFFSET * Math.sin(startAngle),
+      CAKE_HEIGHT / 2,
+      (CAKE_RADIUS / 2) * Math.sin(startAngle) - FACE_OFFSET * Math.cos(startAngle)
+    );
+    planes.push(plane);
+  }
 
-  const plane = new THREE.Mesh(geo, mat);
+  // ---- Face at endAngle ----
+  // Outward normal: (-sin(endAngle), 0, cos(endAngle))
+  // rotation.y = -endAngle aligns the plane normal with that direction.
+  {
+    const geo = new THREE.PlaneGeometry(CAKE_RADIUS * IMAGE_SCALE, CAKE_HEIGHT * IMAGE_SCALE);
+    const mat = new THREE.MeshBasicMaterial({
+      map: texture,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false
+    });
+    const plane = new THREE.Mesh(geo, mat);
+    plane.rotation.y = -endAngle;
+    plane.position.set(
+      (CAKE_RADIUS / 2) * Math.cos(endAngle) - FACE_OFFSET * Math.sin(endAngle),
+      CAKE_HEIGHT / 2,
+      (CAKE_RADIUS / 2) * Math.sin(endAngle) + FACE_OFFSET * Math.cos(endAngle)
+    );
+    planes.push(plane);
+  }
 
-  // The true outward normal of the startAngle cut face (after extruding and rotating the
-  // geometry into upright position) is (sin(startAngle), 0, -cos(startAngle)).
-  // A PlaneGeometry faces +Z by default; rotation.y = π - startAngle makes it face
-  // exactly that outward direction.
-  plane.rotation.y = Math.PI - startAngle;
-
-  // Nudge the plane outward along the correct face normal so it sits just in front of
-  // the cut face and avoids z-fighting with the frosting geometry.
-  const offset = 0.06;
-  plane.position.set(
-    (CAKE_RADIUS / 2) * Math.cos(startAngle) + offset * Math.sin(startAngle),
-    CAKE_HEIGHT / 2,
-    (CAKE_RADIUS / 2) * Math.sin(startAngle) - offset * Math.cos(startAngle)
-  );
-
-  return plane;
+  return planes;
 }
 
 // ---------------------------------------------------------------------------
@@ -555,9 +578,9 @@ function buildCake(memoryTextures) {
     mesh.receiveShadow = true;
     sliceGroup.add(mesh);
 
-    // Image plane at y=0 of slice (the "inside" revealed when slice is lifted)
-    const imgPlane = imagePlaneForSlice(startAngle, endAngle, memoryTextures[i]);
-    sliceGroup.add(imgPlane);
+    // Image planes on both cut faces — visible when slice is pulled out
+    const imgPlanes = imagePlanesForSlice(startAngle, endAngle, memoryTextures[i]);
+    imgPlanes.forEach((p) => sliceGroup.add(p));
 
     // Decorations belonging to this slice
     addSliceDecorations(sliceGroup, i);
@@ -565,7 +588,7 @@ function buildCake(memoryTextures) {
     sliceGroup.userData.radialCenter = midAngle;
     sliceGroup.userData.startAngle = startAngle;
     sliceGroup.userData.endAngle = endAngle;
-    sliceGroup.userData.imagePlane = imgPlane;
+    sliceGroup.userData.imagePlanes = imgPlanes;
     sliceGroup.userData.state = {
       opened: false,
       lift: 0,
@@ -716,7 +739,7 @@ resetBtn.addEventListener("click", () => {
     slice.position.set(0, 0, 0);
     slice.rotation.set(0, 0, 0);
     slice.scale.setScalar(1);
-    slice.userData.imagePlane.material.opacity = 0;
+    slice.userData.imagePlanes.forEach((p) => { p.material.opacity = 0; });
     slice.userData.state.opened = false;
     slice.userData.state.lift = 0;
     slice.userData.state.closing = false;
@@ -757,7 +780,7 @@ function animateSlices() {
         slice.position.set(0, 0, 0);
         slice.rotation.set(0, 0, 0);
         slice.scale.setScalar(1);
-        slice.userData.imagePlane.material.opacity = 0;
+        slice.userData.imagePlanes.forEach((p) => { p.material.opacity = 0; });
         state.opened = false;
         state.closing = false;
         animatedSlices.splice(i, 1);
@@ -805,13 +828,15 @@ function animateSlices() {
     const targetRot = state.targetYRotation;
     slice.rotation.set(0, targetRot * te2, 0);
 
-    // ---- Image plane fade-in (starts midway through phase 2, only when opening) ----
-    const imgPlane = slice.userData.imagePlane;
-    if (!state.closing && phase2 > 0.35) {
-      const fadeT = (phase2 - 0.35) / 0.65;
-      imgPlane.material.opacity = Math.min(easeOutCubic(fadeT), 1);
+    // ---- Image planes fade-in: start during Phase 1 so both cross-section ----
+    // faces are visible as the slice slides clear of the cake.
+    const imgPlanes = slice.userData.imagePlanes;
+    if (!state.closing && phase1 > 0.55) {
+      const fadeT = Math.min((phase1 - 0.55) / 0.45, 1);
+      const opacity = easeOutCubic(fadeT);
+      imgPlanes.forEach((p) => { p.material.opacity = opacity; });
     } else {
-      imgPlane.material.opacity = 0;
+      imgPlanes.forEach((p) => { p.material.opacity = 0; });
     }
   }
 }
