@@ -119,6 +119,19 @@ const slices = [];
 const animatedSlices = [];
 const candlesList = [];
 
+// ── Edit the caption for each slice below ──────────────────────────────────
+// Index 0 = first slice, index 7 = last slice.
+const SLICE_CAPTIONS = [
+  "Memory 1 ✨",  // Slice 1 — edit this text
+  "Memory 2 ✨",  // Slice 2 — edit this text
+  "Memory 3 ✨",  // Slice 3 — edit this text
+  "Memory 4 ✨",  // Slice 4 — edit this text
+  "Memory 5 ✨",  // Slice 5 — edit this text
+  "Memory 6 ✨",  // Slice 6 — edit this text
+  "Memory 7 ✨",  // Slice 7 — edit this text
+  "Memory 8 ✨",  // Slice 8 — edit this text
+];
+
 // ---------------------------------------------------------------------------
 // Textures — improved to look more like real cake
 // ---------------------------------------------------------------------------
@@ -248,13 +261,31 @@ const textureLoader = new THREE.TextureLoader();
 // Memory texture loader
 // ---------------------------------------------------------------------------
 
-function loadMemoryTexture(index) {
-  const extensions = ["jpg", "jpeg", "png", "svg"];
+// One image per slice (8 slices total). Edit filenames here to swap images.
+const MEMORY_IMAGES = [
+  "IMG_1550.PNG",                                // Slice 1
+  "IMG_1604.jpg",                                // Slice 2
+  "IMG_2065.jpg",                                // Slice 3
+  "IMG_4551.jpg",                                // Slice 4
+  "IMG_5384.jpg",                                // Slice 5
+  "IMG_7941.JPG",                                // Slice 6
+  "IMG_9492.jpg",                                // Slice 7
+  "f35a2b33-5909-46c4-ac27-fa5e80584c4b.JPG"    // Slice 8
+];
 
-  function tryLoad(extIndex) {
-    return new Promise((resolve) => {
-      if (extIndex >= extensions.length) {
-        // Fallback placeholder
+function loadMemoryTexture(index) {
+  const path = MEMORY_IMAGES[index];
+
+  return new Promise((resolve) => {
+    textureLoader.load(
+      path,
+      (texture) => {
+        texture.colorSpace = THREE.SRGBColorSpace;
+        resolve(texture);
+      },
+      undefined,
+      () => {
+        // Fallback placeholder if the image fails to load
         const canvas = document.createElement("canvas");
         canvas.width = 900;
         canvas.height = 700;
@@ -284,30 +315,12 @@ function loadMemoryTexture(index) {
         ctx.textAlign = "center";
         ctx.fillText(`Memory ${index + 1}`, canvas.width / 2, canvas.height / 2 - 16);
 
-        ctx.fillStyle = "#7a6272";
-        ctx.font = "32px Inter, sans-serif";
-        ctx.fillText("Add your own photo in assets/images", canvas.width / 2, canvas.height / 2 + 42);
-
         const texture = new THREE.CanvasTexture(canvas);
         texture.colorSpace = THREE.SRGBColorSpace;
         resolve(texture);
-        return;
       }
-
-      const path = `assets/images/memory-${index + 1}.${extensions[extIndex]}`;
-      textureLoader.load(
-        path,
-        (texture) => {
-          texture.colorSpace = THREE.SRGBColorSpace;
-          resolve(texture);
-        },
-        undefined,
-        () => tryLoad(extIndex + 1).then(resolve)
-      );
-    });
-  }
-
-  return tryLoad(0);
+    );
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -698,10 +711,8 @@ renderer.domElement.addEventListener("click", (e) => {
 
   if (!animatedSlices.includes(targetSlice)) animatedSlices.push(targetSlice);
 
-  const remaining = SLICE_COUNT - slices.filter((s) => s.userData.state.opened).length;
-  updateStatus(
-    `Memory ${targetSlice.userData.index + 1} revealed! ✨  ${remaining} slice${remaining !== 1 ? "s" : ""} left.`
-  );
+  const idx = targetSlice.userData.index;
+  updateStatus(idx >= 0 && idx < SLICE_CAPTIONS.length ? SLICE_CAPTIONS[idx] : `Memory ${idx + 1} ✨`);
 });
 
 // ---------------------------------------------------------------------------
