@@ -14,6 +14,14 @@
     rel="stylesheet"
   />
   <link rel="stylesheet" href="styles.css" />
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
 </head>
 <body>
   <div class="page-bg"></div>
@@ -22,12 +30,12 @@
     <p class="eyebrow">INTERACTIVE 3D MEMORY CAKE</p>
     <h1>Cut the cake like it’s real.</h1>
     <p class="sub">
-      Right mouse button rotates the cake. Left mouse drag is your knife.
+      Hold <kbd>Ctrl</kbd> and drag to rotate the cake. Left mouse drag is your knife.
       Cut both sides of the same slice to lift it and reveal the memory inside.
     </p>
 
     <div class="legend">
-      <span>🖱️ RMB drag: rotate</span>
+      <span>🖱️ Ctrl+drag: rotate</span>
       <span>🔪 LMB drag: cut</span>
       <span>🎂 8 slices total</span>
     </div>
