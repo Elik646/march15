@@ -817,6 +817,90 @@ function animateSlices() {
 }
 
 // ---------------------------------------------------------------------------
+// Confetti effect
+// ---------------------------------------------------------------------------
+
+function startConfetti() {
+  const canvas = document.createElement("canvas");
+  canvas.id = "confetti-canvas";
+  canvas.style.cssText =
+    "position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:100;";
+  document.body.appendChild(canvas);
+
+  const ctx = canvas.getContext("2d");
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  resize();
+  window.addEventListener("resize", resize);
+
+  const COLORS = [
+    "#ff6b8a", "#ffd700", "#7b68ee", "#00ced1",
+    "#ff69b4", "#adff2f", "#ff4500", "#00fa9a",
+    "#f9a8d4", "#fbbf24", "#34d399", "#60a5fa"
+  ];
+  const PARTICLE_COUNT = 160;
+
+  const particles = Array.from({ length: PARTICLE_COUNT }, () => ({
+    x: Math.random() * canvas.width,
+    y: Math.random() * canvas.height * 2 - canvas.height,
+    w: 8 + Math.random() * 9,
+    h: 5 + Math.random() * 6,
+    color: COLORS[Math.floor(Math.random() * COLORS.length)],
+    speed: 2.5 + Math.random() * 3.5,
+    angle: Math.random() * Math.PI * 2,
+    angularSpeed: (Math.random() - 0.5) * 0.14,
+    drift: (Math.random() - 0.5) * 1.8,
+    opacity: 0.75 + Math.random() * 0.25
+  }));
+
+  const DURATION = 7000;
+  let startTime = null;
+
+  function draw(timestamp) {
+    if (!startTime) startTime = timestamp;
+    const elapsed = timestamp - startTime;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    for (const p of particles) {
+      p.y += p.speed;
+      p.x += p.drift;
+      p.angle += p.angularSpeed;
+
+      if (p.y > canvas.height + 20) {
+        p.y = -20;
+        p.x = Math.random() * canvas.width;
+      }
+
+      ctx.save();
+      ctx.globalAlpha = p.opacity;
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.angle);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+      ctx.restore();
+    }
+
+    if (elapsed > DURATION - 1500) {
+      const fadeT = Math.min((elapsed - (DURATION - 1500)) / 1500, 1);
+      canvas.style.opacity = String(1 - fadeT);
+    }
+
+    if (elapsed < DURATION) {
+      requestAnimationFrame(draw);
+    } else {
+      window.removeEventListener("resize", resize);
+      canvas.remove();
+    }
+  }
+
+  requestAnimationFrame(draw);
+}
+
+// ---------------------------------------------------------------------------
 // Status helper
 // ---------------------------------------------------------------------------
 
@@ -920,6 +1004,7 @@ async function init() {
     revealMainLights(() => {
       updateStatus("Click on any slice to reveal a memory! 🎂");
       revealUI();
+      startConfetti();
     });
   }, allLitDelay);
 }
