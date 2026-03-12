@@ -4,6 +4,14 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 const sceneEl = document.getElementById("scene");
 const statusText = document.getElementById("statusText");
 const resetBtn = document.getElementById("resetBtn");
+const presentBtn = document.getElementById("presentBtn");
+const presentationModal = document.getElementById("presentationModal");
+const presentationImage = document.getElementById("presentationImage");
+const presentationCaption = document.getElementById("presentationCaption");
+const presentationCounter = document.getElementById("presentationCounter");
+const prevSlideBtn = document.getElementById("prevSlideBtn");
+const nextSlideBtn = document.getElementById("nextSlideBtn");
+const closePresentationBtn = document.getElementById("closePresentationBtn");
 
 const renderer = new THREE.WebGLRenderer({
   antialias: true,
@@ -272,6 +280,32 @@ const MEMORY_IMAGES = [
   "IMG_9492.jpg",                                // Slice 7
   "f35a2b33-5909-46c4-ac27-fa5e80584c4b.JPG"    // Slice 8
 ];
+
+let presentationIndex = 0;
+
+function renderPresentationSlide(index) {
+  presentationIndex = (index + MEMORY_IMAGES.length) % MEMORY_IMAGES.length;
+  presentationImage.src = MEMORY_IMAGES[presentationIndex];
+  presentationCaption.textContent =
+    SLICE_CAPTIONS[presentationIndex] || `Memory ${presentationIndex + 1}`;
+  presentationCounter.textContent = `${presentationIndex + 1} / ${MEMORY_IMAGES.length}`;
+}
+
+function openPresentation(index = 0) {
+  renderPresentationSlide(index);
+  presentationModal.classList.add("is-open");
+  presentationModal.setAttribute("aria-hidden", "false");
+  updateStatus("Presentation mode — use Previous / Next or arrow keys.");
+}
+
+function closePresentation() {
+  presentationModal.classList.remove("is-open");
+  presentationModal.setAttribute("aria-hidden", "true");
+}
+
+function shiftPresentation(direction) {
+  renderPresentationSlide(presentationIndex + direction);
+}
 
 function loadMemoryTexture(index) {
   const path = MEMORY_IMAGES[index];
@@ -717,6 +751,7 @@ renderer.domElement.addEventListener("click", (e) => {
 
   const idx = targetSlice.userData.index;
   updateStatus(idx >= 0 && idx < SLICE_CAPTIONS.length ? SLICE_CAPTIONS[idx] : `Memory ${idx + 1} ✨`);
+  openPresentation(idx);
 });
 
 // ---------------------------------------------------------------------------
@@ -742,6 +777,41 @@ resetBtn.addEventListener("click", () => {
   controls.target.set(0, 1.0, 0);
   controls.update();
   updateStatus("Cake reset — click on any slice to reveal a memory! 🎂");
+  closePresentation();
+});
+
+presentBtn.addEventListener("click", () => {
+  openPresentation(0);
+});
+
+prevSlideBtn.addEventListener("click", () => {
+  shiftPresentation(-1);
+});
+
+nextSlideBtn.addEventListener("click", () => {
+  shiftPresentation(1);
+});
+
+closePresentationBtn.addEventListener("click", () => {
+  closePresentation();
+});
+
+presentationModal.addEventListener("click", (event) => {
+  if (event.target === presentationModal) {
+    closePresentation();
+  }
+});
+
+window.addEventListener("keydown", (event) => {
+  if (!presentationModal.classList.contains("is-open")) return;
+
+  if (event.key === "ArrowRight") {
+    shiftPresentation(1);
+  } else if (event.key === "ArrowLeft") {
+    shiftPresentation(-1);
+  } else if (event.key === "Escape") {
+    closePresentation();
+  }
 });
 
 // ---------------------------------------------------------------------------

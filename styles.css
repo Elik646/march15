@@ -179,7 +179,8 @@ body {
   color: #644d5d;
 }
 
-#resetBtn {
+#resetBtn,
+#presentBtn {
   appearance: none;
   border: 0;
   border-radius: 16px;
@@ -193,12 +194,14 @@ body {
   transition: transform 0.18s ease, box-shadow 0.18s ease;
 }
 
-#resetBtn:hover {
+#resetBtn:hover,
+#presentBtn:hover {
   transform: translateY(-2px);
   box-shadow: 0 22px 40px rgba(93, 49, 75, 0.28);
 }
 
-#resetBtn:active {
+#resetBtn:active,
+#presentBtn:active {
   transform: translateY(0);
 }
 
@@ -221,6 +224,73 @@ body {
   display: block;
   width: 100%;
   height: 100%;
+}
+
+.presentation-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: none;
+  place-items: center;
+  background: rgba(24, 13, 20, 0.7);
+  backdrop-filter: blur(6px);
+}
+
+.presentation-modal.is-open {
+  display: grid;
+}
+
+.presentation-card {
+  width: min(920px, calc(100vw - 30px));
+  border-radius: 18px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 22px 60px rgba(24, 13, 20, 0.35);
+}
+
+#presentationImage {
+  width: 100%;
+  max-height: min(62vh, 680px);
+  object-fit: contain;
+  border-radius: 12px;
+  background: #f6edf3;
+}
+
+.presentation-footer {
+  margin-top: 10px;
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: center;
+  color: #5d3f52;
+  font-weight: 600;
+}
+
+#presentationCaption {
+  min-height: 1.4em;
+}
+
+#presentationCounter {
+  font-size: 14px;
+  color: #886678;
+}
+
+.presentation-controls {
+  margin-top: 10px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.presentation-controls button {
+  appearance: none;
+  border: 0;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-weight: 700;
+  cursor: pointer;
+  background: linear-gradient(135deg, #7a4764, #5d314b);
+  color: #fff;
 }
 
 @media (max-width: 900px) {

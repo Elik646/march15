@@ -40,3 +40,4 @@ Your app should be live in a minute or two.
 - The app is fully static, so it works well on GitHub Pages.
 - The 3D look is created with CSS transforms, layered faces, shadows, and animated slice movement.
 - Click **Reset cake** to close all slices again.
+- Click **Start presentation** to open a fullscreen slideshow with previous/next controls.
