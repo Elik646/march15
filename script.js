@@ -282,25 +282,30 @@ const MEMORY_IMAGES = [
 ];
 
 let presentationIndex = 0;
+let presentationTriggerEl = null;
 
 function renderPresentationSlide(index) {
   presentationIndex = (index + MEMORY_IMAGES.length) % MEMORY_IMAGES.length;
   presentationImage.src = MEMORY_IMAGES[presentationIndex];
-  presentationCaption.textContent =
-    SLICE_CAPTIONS[presentationIndex] || `Memory ${presentationIndex + 1}`;
+  const caption = SLICE_CAPTIONS[presentationIndex] || `Memory ${presentationIndex + 1}`;
+  presentationCaption.textContent = caption;
+  presentationImage.alt = caption;
   presentationCounter.textContent = `${presentationIndex + 1} / ${MEMORY_IMAGES.length}`;
 }
 
-function openPresentation(index = 0) {
+function openPresentation(index = 0, triggerEl = null) {
+  presentationTriggerEl = triggerEl || presentBtn;
   renderPresentationSlide(index);
   presentationModal.classList.add("is-open");
   presentationModal.setAttribute("aria-hidden", "false");
+  closePresentationBtn.focus();
   updateStatus("Presentation mode — use Previous / Next or arrow keys.");
 }
 
 function closePresentation() {
   presentationModal.classList.remove("is-open");
   presentationModal.setAttribute("aria-hidden", "true");
+  (presentationTriggerEl || presentBtn).focus();
 }
 
 function shiftPresentation(direction) {
@@ -751,7 +756,6 @@ renderer.domElement.addEventListener("click", (e) => {
 
   const idx = targetSlice.userData.index;
   updateStatus(idx >= 0 && idx < SLICE_CAPTIONS.length ? SLICE_CAPTIONS[idx] : `Memory ${idx + 1} ✨`);
-  openPresentation(idx);
 });
 
 // ---------------------------------------------------------------------------
@@ -781,7 +785,7 @@ resetBtn.addEventListener("click", () => {
 });
 
 presentBtn.addEventListener("click", () => {
-  openPresentation(0);
+  openPresentation(0, presentBtn);
 });
 
 prevSlideBtn.addEventListener("click", () => {
