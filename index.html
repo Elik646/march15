@@ -40,6 +40,7 @@
         <div id="statusText">Click on a slice to reveal a memory!</div>
       </div>
 
+      <button id="presentBtn" type="button">Start presentation</button>
       <button id="resetBtn" type="button">Reset cake</button>
     </aside>
 
@@ -47,6 +48,21 @@
       <div id="scene"></div>
     </section>
   </main>
+
+  <section id="presentationModal" class="presentation-modal" aria-hidden="true">
+    <div class="presentation-card" role="dialog" aria-modal="true" aria-label="Memory presentation">
+      <img id="presentationImage" alt="Memory slide" />
+      <div class="presentation-footer">
+        <div id="presentationCaption"></div>
+        <div id="presentationCounter"></div>
+      </div>
+      <div class="presentation-controls">
+        <button id="prevSlideBtn" type="button">Previous</button>
+        <button id="nextSlideBtn" type="button">Next</button>
+        <button id="closePresentationBtn" type="button">Close</button>
+      </div>
+    </div>
+  </section>
 
   <script type="module" src="script.js"></script>
 </body>
